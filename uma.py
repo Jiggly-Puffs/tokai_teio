@@ -98,6 +98,7 @@ class UmaHohoho(object):
             self.pre_init()  # generate a new account
             self.pro = UmaProto(self.cert_uuid)
             self.uma_signup()
+        #self.uma_daily()
 
     def set_name_sex(self, name, sex):
         self.name = name
@@ -136,34 +137,8 @@ class UmaHohoho(object):
         if not self.sex:
             self.sex = random.randint(1, 2)
         self.gen_device_info()
-        self.register_session()
+        #self.register_session()
         #self.register_firebase()
-
-    def register_session(self):
-        JST = pytz.timezone('Asia/Tokyo')
-        now = datetime.now(timezone.utc).astimezone(JST).strftime('%Y-%m-%d %H:%M:%S')
-        OMO_URL = requests.utils.requote_uri("https://omotenashi.cygames.jp/api/v1/Session?APP_ID=110&INSTALL_ID=AA0000000000&EVENT_DATE=%s&RETRY_COUNT=0&APP_VIEWER_ID=%s&SDK_VERSION=4.24.0" % (now, self.app_viewer_id))
-        OMO_HEADERS = {
-            "Install-id": "AA0000000000",
-            "App-version": APP_VER,
-            "Os": "Android",
-            "App-salt": "",
-            "Environment-mode": "1",
-            "Event-date": now,
-            "Retry-count": "0",
-            "App-viewer-id": self.app_viewer_id,
-            "App-id": "110",
-            "Sdk-version": "4.24.0",
-            "User-agent": "Mozilla/5.0 (Linux; Android 10; SM-A102U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.72 Mobile Safari/537.36",
-        }
-        OMO_DATA = {
-            "ID": "e9ddb9e3dbe41bda26f02bd294927078",
-        }
-        print(OMO_URL)
-        #print(OMO_HEADERS)
-        r = requests.post(OMO_URL, data=OMO_DATA, headers=OMO_HEADERS)
-        #print(r.status_code)
-        #print(r.text)
 
     def update_resp(self, resp):
         print(resp)
