@@ -2,19 +2,24 @@
 
 import os
 import sys
+import pytz
+import json
+import uuid
 import base64
 import random
 import string
 import struct
 import codecs
 import msgpack
-import hashlib
 import secrets
 import requests
+from hashlib import md5
+from datetime import datetime, timezone
+
 
 UMA_URL = "https://api-umamusume.cygames.jp/umamusume"
 APP_VER = "1.3.2"
-RES_VER = "10001310:TWMvHe0MQgo3"
+RES_VER = "10001420:TSVRrfC372gH"
 
 BRANDS = ["Samsung", "Xiaomi", "Sony", "Sharp", "Toshiba", "Google", "Casio", "Fujitsu", "HP", "Lenovo", "LG", "Panasonic", "Kyocera", "DoCoMo"]
 USER_AGENT = "Mozilla/5.0 (Linux; Android 10; SM-A102U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.72 Mobile Safari/537.36"
@@ -38,19 +43,14 @@ class UmaProto(object):
         self.compress(data)
 
     def compress(self, data):
-        with open("tmp/req", "wb") as f:
-            f.write(data)
+        open("tmp/req", "wb").write(data)
         os.system("./proto 0 tmp")
-        with open("tmp/req.enc", "rb") as f:
-            self.data = base64.b64encode(f.read())
+        self.data = base64.b64encode(open("tmp/req.enc", "rb").read())
 
     def decompress(self, data):
-        data = base64.b64decode(data.strip())
-        with open("tmp/resp", "wb") as f:
-            f.write(data)
+        open("tmp/resp", "wb").write(base64.b64decode(data.strip()))
         os.system("./proto 1 tmp")
-        with open("tmp/resp.dec", "rb") as f:
-            self.resp = f.read()
+        self.resp = open("tmp/resp.dec", "rb").read()
 
     def update_headers(self):
         self.headers = {
@@ -61,10 +61,10 @@ class UmaProto(object):
             "ViewerID": str(self.viewer_id),
             "User-agent": USER_AGENT,
         }
-        print(self.headers)
+        #print(self.headers)
 
     def post(self):
-        print(self.data)
+        #print(self.data)
         r = requests.post(self.url, data=self.data, headers=self.headers)
         print(r.status_code)
         self.decompress(r.text)
@@ -75,7 +75,8 @@ class UmaProto(object):
         self.session_id = session_id
         self.viewer_id = viewer_id
         self.auth_key = auth_key
-        print(data)
+        print(self.url)
+        #print(data)
         self.con_req(data)
         self.update_headers()
         return self.post()
@@ -88,7 +89,6 @@ class UmaHohoho(object):
         if device_info: # load account from db
             self.viewer_id = viewer_id
             self.device_info = device_info
-            # load
             self.gen_session_id()
             self.pro = UmaProto(self.cert_uuid)
             self.uma_login()
@@ -107,15 +107,12 @@ class UmaHohoho(object):
         self.device_info = {
             "viewer_id": 0,
             "device": 2,
-            #"device_id": self.device_id,
-            "device_id": "652497c376f58028f04e6b959fd48e36",
-            #"device_name": self.brand + " " + "".join(random.choice(string.ascii_uppercase) for i in range(random.randint(6, 8))),
-            "device_name": "Xiaomi M2004J7AC",
+            "device_id": self.device_id,
+            "device_name": self.brand + " " + "".join(random.choice(string.ascii_uppercase) for i in range(random.randint(6, 8))),
             "graphics_device_name": "Mali-G57",
-            "ip_address": "192.168."+str(random.randint(0, 254))+"."+str(random.randint(1, 254)),
+            "ip_address": "192.168." + str(random.randint(0, 254)) + "." + str(random.randint(1, 254)),
             "platform_os_version": "Android OS 10 / API-29 (QP1A.190711.020/V12.0.7.0.QJHCNXM)",
-            #"carrier": self.brand,
-            "carrier": "Redmi",
+            "carrier": self.brand,
             "keychain": 0,
             "locale": "JPN",
             "dmm_viewer_id": None,
@@ -123,16 +120,16 @@ class UmaHohoho(object):
         }
 
     def gen_session_id(self):
-        cert_uuid = self.cert_uuid.hex()
-        cert_uuid = cert_uuid[:8] + "-" + cert_uuid[8:12] + "-" + cert_uuid[12:16] + "-" + cert_uuid[16:20] + "-" + cert_uuid[20:]
-        md5 = hashlib.md5()
-        md5.update((str(self.viewer_id) + cert_uuid + 'r!I@mt8e5i=').encode("utf8"))
-        self.session_id = md5.digest()
-        print(self.session_id.hex())
+        self.session_id = md5((str(self.viewer_id) + self.app_viewer_id + 'r!I@mt8e5i=').encode("utf8")).digest()
+        #print(self.session_id.hex())
 
     def pre_init(self):
         self.viewer_id = 0
         self.cert_uuid = secrets.token_bytes(16)
+        self.app_viewer_id = str(uuid.uuid4())
+        self.cert_uuid = codecs.decode(self.app_viewer_id.replace("-", ""), "hex")
+        #print(self.cert_uuid.hex())
+        print(self.app_viewer_id)
         self.gen_session_id()
         self.device_id = codecs.encode(secrets.token_bytes(16), "hex").decode("utf8")
         self.brand = BRANDS[random.randint(0, len(BRANDS)-1)]
@@ -141,15 +138,44 @@ class UmaHohoho(object):
         if not self.sex:
             self.sex = random.randint(1, 2)
         self.gen_device_info()
+        self.register_session()
+        #self.register_firebase()
+
+    def register_session(self):
+        JST = pytz.timezone('Asia/Tokyo')
+        now = datetime.now(timezone.utc).astimezone(JST).strftime('%Y-%m-%d %H:%M:%S')
+        OMO_URL = requests.utils.requote_uri("https://omotenashi.cygames.jp/api/v1/Session?APP_ID=110&INSTALL_ID=AA0000000000&EVENT_DATE=%s&RETRY_COUNT=0&APP_VIEWER_ID=%s&SDK_VERSION=4.24.0" % (now, self.app_viewer_id))
+        OMO_HEADERS = {
+            "Install-id": "AA0000000000",
+            "App-version": APP_VER,
+            "Os": "Android",
+            "App-salt": "",
+            "Environment-mode": "1",
+            "Event-date": now,
+            "Retry-count": "0",
+            "App-viewer-id": self.app_viewer_id,
+            "App-id": "110",
+            "Sdk-version": "4.24.0",
+            "User-agent": "Mozilla/5.0 (Linux; Android 10; SM-A102U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.72 Mobile Safari/537.36",
+        }
+        OMO_DATA = {
+            "ID": "e9ddb9e3dbe41bda26f02bd294927078",
+        }
+        print(OMO_URL)
+        #print(OMO_HEADERS)
+        r = requests.post(OMO_URL, data=OMO_DATA, headers=OMO_HEADERS)
+        #print(r.status_code)
+        #print(r.text)
 
     def update_resp(self, resp):
         print(resp)
+        if resp["response_code"] != 1:
+            print("ERROR RESP!!!")
+            sys.exit(0)
         if resp.get("data_headers"):
             data_headers = resp["data_headers"]
             if data_headers.get("sid"):
-                md5 = hashlib.md5()
-                md5.update(data_headers.get("sid").encode("utf8") + b'r!I@mt8e5i=')
-                self.session_id = md5.digest()
+                self.session_id = md5(data_headers.get("sid").encode("utf8") + b'r!I@mt8e5i=').digest()
         if resp.get("data"):
             data = resp["data"]
             if data.get("viewer_id"):
@@ -167,11 +193,10 @@ class UmaHohoho(object):
         data = self.device_info
         resp = self.pro.run("/tool/pre_signup", self.session_id, data, self.viewer_id, self.auth_key)
         self.update_resp(resp)
-        return
 
         data = self.device_info
         data["credential"] = ""
-        data["error_code"] = ""
+        data["error_code"] = 0
         data["error_message"] = ""
         resp = self.pro.run("/tool/signup", self.session_id, data, self.viewer_id, self.auth_key)
         self.update_resp(resp)
