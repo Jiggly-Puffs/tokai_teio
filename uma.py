@@ -44,12 +44,12 @@ class UmaProto(object):
 
     def compress(self, data):
         open("tmp/req", "wb").write(data)
-        os.system("./proto 0 tmp")
+        os.system("./utils/proto 0 tmp")
         self.data = base64.b64encode(open("tmp/req.enc", "rb").read())
 
     def decompress(self, data):
         open("tmp/resp", "wb").write(base64.b64decode(data.strip()))
-        os.system("./proto 1 tmp")
+        os.system("./utils/proto 1 tmp")
         self.resp = open("tmp/resp.dec", "rb").read()
 
     def update_headers(self):

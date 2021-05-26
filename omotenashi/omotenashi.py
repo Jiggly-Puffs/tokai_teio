@@ -9,7 +9,8 @@ import codecs
 import base64
 import secrets
 import requests
-from omotenash import checkin_pb2
+from utils.logger import *
+from omotenashi import checkin_pb2
 from datetime import datetime, timezone
 
 
@@ -21,11 +22,13 @@ class Omotenashi(object):
         self.firebase = firebase
 
     def register(self):
+        INFO("Register Omotenashi...")
         self.register_session()
         self.register_firebase()
         self.register_event()
 
     def update(self):
+        INFO("Update Omotenashi...")
         self.register_session()
         self.refresh_token()
         self.register_event()
@@ -49,9 +52,10 @@ class Omotenashi(object):
         OMO_DATA = {
             "ID": "e9ddb9e3dbe41bda26f02bd294927078",
         }
-        print(OMO_URL)
-        requests.post(OMO_URL, data=OMO_DATA, headers=OMO_HEADERS)
-
+        DEBUG("register session: %s" % OMO_URL)
+        r = requests.post(OMO_URL, data=OMO_DATA, headers=OMO_HEADERS)
+        if r.status_code != 200:
+            ERROR("register session failed")
 
     def register_firebase(self):
         FIRE_URL = "https://firebaseinstallations.googleapis.com/v1/projects/gallop-28588356/installations"
@@ -71,11 +75,11 @@ class Omotenashi(object):
             "authVersion": "FIS_v2",
             "sdkVersion": "a:16.3.3",
         }
-        print(FIRE_URL)
         r = requests.post(FIRE_URL, data=json.dumps(FIRE_DATA), headers=FIRE_HEADERS)
-        print(r.text)
+        if r.status_code != 200:
+            ERROR("register firebase failed")
+        DEBUG(r.text)
         con = json.loads(r.text)
-        print()
 
         self.firebase["fid"] = con["fid"]
         self.firebase["fire_url"] = "https://firebaseinstallations.googleapis.com/v1/projects" + con["name"]
@@ -90,6 +94,7 @@ class Omotenashi(object):
         exptime = json.loads(base64.b64decode(data+"="*(4-(len(data)%4))))["exp"]
         now = int(time.time())
         if now < exptime:
+            INFO("Token is still effective")
             return
 
         FIRE_URL = "https://firebaseinstallations.googleapis.com/v1/projects/gallop-28588356/installations" + "/" + self.firebase["fid"] + "/authTokens:generate"
@@ -108,11 +113,11 @@ class Omotenashi(object):
                 "sdkVersion": "a:16.3.3",
             },
         }
-        print(FIRE_URL)
         r = requests.post(FIRE_URL, data=json.dumps(FIRE_DATA), headers=FIRE_HEADERS)
-        print(r.text)
+        if r.status_code != 200:
+            ERROR("register firebase failed")
+        DEBUG(r.text)
         con = json.loads(r.text)
-        print()
 
         self.firebase["auth_token"] = con["token"]
         self.get_token()
@@ -160,8 +165,7 @@ class Omotenashi(object):
             self.firebase["security_token"] = str(cresp.securityToken)
             self.firebase["version_info"] = cresp.versionInfo
         else:
-            print(r.text)
-            sys.exit(0)
+            ERROR("Google checkin failed %s" % r.text)
 
     def get_token(self):
         FCM_URL = "https://android.clients.google.com/c2dm/register3"
@@ -192,13 +196,13 @@ class Omotenashi(object):
             'X-Firebase-Client': 'fire-abt/17.1.1+fire-installations/16.3.1+fire-android/+fire-analytics/17.4.2+fire-iid/20.2.0+fire-rc/17.0.0+fire-fcm/20.2.0+fire-cls/17.0.0+fire-cls-ndk/17.0.0+fire-core/19.3.0',
             'X-Firebase-Client-Log-Type': '1',
         }
-        print(FCM_URL)
         r = requests.post(FCM_URL, data=FCM_DATA, headers=FCM_HEADERS)
-        self.token = r.text.split("=")[1]
-        print(self.token)
-        print()
+        if r.status_code != 200:
+            ERROR("Google get token failed")
         if 'Error' in r.text:
-            sys.exit(0)
+            ERROR("Google get token failed")
+        self.token = r.text.split("=")[1]
+        DEBUG("Get token: %s" % self.token)
 
     def unregister_firebase(self):
         FIRE_URL = "https://firebaseinstallations.googleapis.com/v1/projects/gallop-28588356/installations" + "/" + self.firebase["fid"]
@@ -212,10 +216,10 @@ class Omotenashi(object):
             "x-goog-api-key": "AIzaSyBlOXUUCnIb5zssdk-_Sq0QNViUi_EE0io",
             "Authorization": "FIS_v2 " + self.firebase["refresh_token"]
         }
-        print(FIRE_URL)
         r = requests.delete(FIRE_URL, headers=FIRE_HEADERS)
-        print(r.text)
-        print()
+        if r.status_code != 200:
+            ERROR("firebase unregister failed")
+        DEBUG(r.text)
 
     def register_event(self):
         now = datetime.now(timezone.utc).astimezone(pytz.timezone('Asia/Tokyo')).strftime('%Y-%m-%d %H:%M:%S')
@@ -245,8 +249,9 @@ class Omotenashi(object):
                 "SKU": "",
                 "ITEM_NAME": self.token,
         }
-        print(OMO_URL)
-        requests.post(OMO_URL, data=OMO_DATA, headers=OMO_HEADERS)
+        r = requests.post(OMO_URL, data=OMO_DATA, headers=OMO_HEADERS)
+        if r.status_code != 200:
+            ERROR("register event failed")
 
 
 if __name__ == "__main__":
