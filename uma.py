@@ -84,11 +84,12 @@ class UmaProto(object):
 
 class UmaHohoho(object):
 
-    def __init__(self, viewer_id=None, device_info=None):
+    def __init__(self, app_viewer_id=None, device_info=None):
         self.auth_key = None
         if device_info: # load account from db
-            self.viewer_id = viewer_id
+            self.app_viewer_id = app_viewer_id
             self.device_info = device_info
+            self.viewer_id = self.device_info["viewer_id"]
             self.gen_session_id()
             self.pro = UmaProto(self.cert_uuid)
             self.uma_login()
