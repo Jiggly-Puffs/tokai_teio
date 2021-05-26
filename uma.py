@@ -120,15 +120,13 @@ class UmaHohoho(object):
         }
 
     def gen_session_id(self):
+        self.cert_uuid = codecs.decode(self.app_viewer_id.replace("-", ""), "hex")
         self.session_id = md5((str(self.viewer_id) + self.app_viewer_id + 'r!I@mt8e5i=').encode("utf8")).digest()
         #print(self.session_id.hex())
 
     def pre_init(self):
         self.viewer_id = 0
-        self.cert_uuid = secrets.token_bytes(16)
         self.app_viewer_id = str(uuid.uuid4())
-        self.cert_uuid = codecs.decode(self.app_viewer_id.replace("-", ""), "hex")
-        #print(self.cert_uuid.hex())
         print(self.app_viewer_id)
         self.gen_session_id()
         self.device_id = codecs.encode(secrets.token_bytes(16), "hex").decode("utf8")
