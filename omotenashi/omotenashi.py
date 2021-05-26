@@ -3,12 +3,13 @@
 import uuid
 import pytz
 import json
+import time
 import random
 import codecs
 import base64
 import secrets
 import requests
-import checkin_pb2
+from omotenash import checkin_pb2
 from datetime import datetime, timezone
 
 
@@ -18,10 +19,6 @@ class Omotenashi(object):
         self.app_viewer_id = app_viewer_id
         self.app_ver = app_ver
         self.firebase = firebase
-        if self.firebase:
-            self.update()
-        else:
-            self.register()
 
     def register(self):
         self.register_session()
@@ -76,8 +73,8 @@ class Omotenashi(object):
         }
         print(FIRE_URL)
         r = requests.post(FIRE_URL, data=json.dumps(FIRE_DATA), headers=FIRE_HEADERS)
+        print(r.text)
         con = json.loads(r.text)
-        print(con)
         print()
 
         self.firebase["fid"] = con["fid"]
@@ -95,7 +92,7 @@ class Omotenashi(object):
         if now < exptime:
             return
 
-        FIRE_URL = self.firebase["fire_url"] + "/authTokens:generate"
+        FIRE_URL = "https://firebaseinstallations.googleapis.com/v1/projects/gallop-28588356/installations" + "/" + self.firebase["fid"] + "/authTokens:generate"
         FIRE_HEADERS = {
             "Content-Type": "application/json",
             "Accept": "application/json",
@@ -113,15 +110,11 @@ class Omotenashi(object):
         }
         print(FIRE_URL)
         r = requests.post(FIRE_URL, data=json.dumps(FIRE_DATA), headers=FIRE_HEADERS)
+        print(r.text)
         con = json.loads(r.text)
-        print(con)
         print()
 
-        self.firebase["fid"] = con["fid"]
-        self.firebase["fire_url"] = "https://firebaseinstallations.googleapis.com/v1/projects" + con["name"]
-        self.firebase["refresh_token"] = con["refreshToken"]
-        self.firebase["auth_token"] = con["authToken"]["token"]
- 
+        self.firebase["auth_token"] = con["token"]
         self.get_token()
 
     def checkin(self):
@@ -208,7 +201,7 @@ class Omotenashi(object):
             sys.exit(0)
 
     def unregister_firebase(self):
-        FIRE_URL = self.firebase["fire_url"]
+        FIRE_URL = "https://firebaseinstallations.googleapis.com/v1/projects/gallop-28588356/installations" + "/" + self.firebase["fid"]
         FIRE_HEADERS = {
             "Content-Type": "application/json",
             "Accept": "application/json",
@@ -258,4 +251,7 @@ class Omotenashi(object):
 
 if __name__ == "__main__":
     app_viewer_id = str(uuid.uuid4())
-    Omotenashi(app_viewer_id, "1.3.2")
+    omo = Omotenashi(app_viewer_id, "1.3.2")
+    omo.register()
+    omo.update()
+
