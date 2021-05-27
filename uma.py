@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 
 
 UMA_URL = "https://api-umamusume.cygames.jp/umamusume"
-APP_VER = "1.3.2"
+APP_VER = "1.4.0"
 RES_VER = "10001420:TSVRrfC372gH"
 
 BRANDS = ["Samsung", "Xiaomi", "Sony", "Sharp", "Toshiba", "Google", "Casio", "Fujitsu", "HP", "Lenovo", "LG", "Panasonic", "Kyocera", "DoCoMo"]
@@ -32,7 +32,7 @@ class UmaProto(object):
         self.viewer_id = 0
 
     def con_req(self, buf):
-        data = codecs.decode("6b20e2ab6c311330f761d737ce3f3025750850665eea58b6372f8d2f57501eb34d0c4b6a47cc9d7a74f1735d6100e46aa037bd69", "hex")
+        data = codecs.decode("6b20e2ab6c311330f761d737ce3f3025750850665eea58b6372f8d2f57501eb348ee86c2de2699100d32f9e07dbfccb9a8fe658b", "hex")
         data += self.session_id
         data += self.cert_uuid
         data += secrets.token_bytes(32)
@@ -61,10 +61,10 @@ class UmaProto(object):
             "ViewerID": str(self.viewer_id),
             "User-agent": USER_AGENT,
         }
-        #print(self.headers)
+        print(self.headers)
 
     def post(self):
-        #print(self.data)
+        print(self.data)
         r = requests.post(self.url, data=self.data, headers=self.headers)
         print(r.status_code)
         self.decompress(r.text)
