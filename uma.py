@@ -27,10 +27,10 @@ USER_AGENT = "Mozilla/5.0 (Linux; Android 10; SM-A102U) AppleWebKit/537.36 (KHTM
 
 class UmaProto(object):
 
-    def __init__(self, cert_uuid, viewer_id=0):
+    def __init__(self, cert_uuid, viewer_id=0, auth_key=None):
         self.cert_uuid = cert_uuid
         self.viewer_id = viewer_id
-        self.auth_key = None
+        self.auth_key = auth_key
 
     def set_viewer_id(self, viewer_id):
         self.viewer_id = viewer_id
@@ -92,7 +92,7 @@ class Derby(object):
         else:
             self.uma_init()  # generate a new account
 
-        self.proto = UmaProto(self.cert_uuid, self.viewer_id)
+        self.proto = UmaProto(self.cert_uuid, self.viewer_id, self.auth_key)
         #self.omotenashi()
 
     def load(self, data):
@@ -100,6 +100,7 @@ class Derby(object):
         self.device_info = data["device_info"]
         self.firebase = data["firebase"]
         self.viewer_id = self.device_info["viewer_id"]
+        self.auth_key = base64.b64decode(data["auth_key"])
         self.gen_session_id()
 
     def tojson(self):
@@ -107,6 +108,7 @@ class Derby(object):
         data["app_viewer_id"] = self.app_viewer_id
         data["device_info"] = self.device_info
         data["firebase"] = self.firebase
+        data["auth_key"] = base64.b64encode(self.auth_key).decode("utf8")
         return json.dumps(data)
 
     def set_name_sex(self, name, sex):
@@ -147,6 +149,7 @@ class Derby(object):
         self.sex = random.randint(1, 2)
         self.gen_device_info()
         self.firebase = {}
+        self.auth_key = None
 
     def omotenashi(self):
         from omotenashi.omotenashi import Omotenashi
@@ -172,7 +175,8 @@ class Derby(object):
                     self.device_info["viewer_id"] = self.viewer_id
                     self.proto.set_viewer_id(self.viewer_id)
             if data.get("auth_key"):
-                self.proto.set_auth_key(base64.b64decode(data["auth_key"]))
+                self.auth_key = base64.b64decode(data["auth_key"])
+                self.proto.set_auth_key(self.auth_key)
             if data.get("resource_version"):
                 global RES_VER
                 if data["resource_version"] != RES_VER:
@@ -250,10 +254,11 @@ class Derby(object):
         self.update_resp(resp)
         missions = self.parse_mission(resp)
 
-        data = self.device_info.copy()
-        data['mission_id_array'] = missions
-        resp = self.proto.run("/mission/receive", self.session_id, data)
-        self.update_resp(resp)
+        if missions:
+            data = self.device_info.copy()
+            data['mission_id_array'] = missions
+            resp = self.proto.run("/mission/receive", self.session_id, data)
+            self.update_resp(resp)
 
         # receive gifts
         data = self.device_info.copy()
