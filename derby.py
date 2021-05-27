@@ -248,6 +248,9 @@ class Derby(object):
         resp = self.proto.run("/payment/send_log", self.session_id, data)
         self.update_resp(resp)
 
+        self.uma_receive_gifts()
+
+    def uma_receive_gifts(self):
         # get mission & receive mission_gift
         data = self.device_info.copy()
         resp = self.proto.run("/mission/index", self.session_id, data)
@@ -277,16 +280,25 @@ class Derby(object):
         resp = self.proto.run("/present/receive_all", self.session_id, data)
         self.update_resp(resp)
 
+    def check_fcoin(self):
         data = self.device_info.copy()
         resp = self.proto.run("/load/index", self.session_id, data)
         self.update_resp(resp)
         self.parse_fcoin(resp)
-        # next c_one/1621328531022.HEADERS
 
     def uma_login(self):
         data = self.device_info.copy()
         resp = self.proto.run("/tool/start_session", self.session_id, data)
         self.update_resp(resp)
+
+    def uma_view_card(self):
+        pass
+
+    def uma_view_support_card(self):
+        pass
+
+    def uma_support_card_limit_break(self):
+        pass
 
     def uma_gacha(self):
         pass
