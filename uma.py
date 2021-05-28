@@ -32,7 +32,7 @@ class Teio(object):
             derby = Derby(data)
             derby.uma_login()
             derby.uma_daily()
-            derby.check_fcoin()
+            derby.uma_info()
 
 
 if __name__ == "__main__":

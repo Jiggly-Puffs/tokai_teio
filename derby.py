@@ -181,12 +181,39 @@ class Derby(object):
                 global RES_VER
                 if data["resource_version"] != RES_VER:
                     RES_VER = data["resource_version"]
-                    INFO("NEW RES-VER: %s" % RES_VER)
+                    WARN("NEW RES-VER: %s" % RES_VER)
 
-    def parse_fcoin(self, resp):
+    def parse_gacha(self, resp):
+        gachas = resp["data"]["gacha_info_list"]
+        gacha_id = []
+        for gacha in gachas:
+            gacha_id.append(gacha["id"])
+        return gacha_id
+
+    def parse_info(self, resp):
         data = resp["data"]
-        self.fcoin = data["coin_info"]["fcoin"]
-        INFO("FCOIN %d" % self.fcoin)
+        info = {}
+        info["fcoin"] = data["coin_info"]["fcoin"]
+        info["card_list"] = data["card_list"]
+        '''
+        'card_id': 105601,
+        'rarity': 1,
+        'talent_level': 1,
+        'create_time': '2021-05-27 21:28:56'
+        '''
+        info["support_card_list"] = data["support_card_list"]
+        '''
+        'viewer_id': 219420285,
+        'support_card_id': 10001,
+        'exp': 60,
+        'limit_break_count': 0,
+        'favorite_flag': 0,
+        'stock': 0,
+        'possess_time': '2021-05-27 17:53:18',
+        'create_time': '2021-05-27 17:53:18'
+        '''
+        INFO("FCOIN %d" % info["fcoin"])
+        return info
 
     def parse_mission(self, resp):
         data = resp["data"]
@@ -280,25 +307,85 @@ class Derby(object):
         resp = self.proto.run("/present/receive_all", self.session_id, data)
         self.update_resp(resp)
 
-    def check_fcoin(self):
+    def uma_info(self):
         data = self.device_info.copy()
         resp = self.proto.run("/load/index", self.session_id, data)
         self.update_resp(resp)
-        self.parse_fcoin(resp)
+        return self.parse_info(resp)
 
     def uma_login(self):
         data = self.device_info.copy()
         resp = self.proto.run("/tool/start_session", self.session_id, data)
         self.update_resp(resp)
 
-    def uma_view_card(self):
-        pass
+    def uma_gacha_info(self):
+        data = self.device_info.copy()
+        resp = self.proto.run("/gacha/index", self.session_id, data)
+        self.update_resp(resp)
+        return self.parse_gacha(resp)
 
-    def uma_view_support_card(self):
-        pass
+    def uma_gacha_exec(self, gacha_id, num, fcoin):
+        data = self.device_info_copy()
+        data["gacha_id"] = gacha_id
+        data["draw_type"] = 1
+        data["draw_num"] = num
+        data["current_num"] = fcoin
+        data["item_id"] = 0
+        resp = self.proto.run("/gacha/exec", self.session_id, data)
 
-    def uma_support_card_limit_break(self):
-        pass
+    def uma_support_card_limit_break(self, support_card_id):
+        DEBUG("Support card %d limit break" % support_card_id)
+        data = self.device_info.copy()
+        data["support_card_id"] = support_card_id
+        data["material_support_card_num"] = 1
+        resp = self.proto.run("/support_card/limit_break", self.session_id, data)
+        self.update_resp(resp)
 
-    def uma_gacha(self):
-        pass
+    def uma_chara_story(self, episode_id):
+        data["episode_id"] = episode_id
+        data = self.device_info.copy()
+        resp = self.proto.run("/character_story/first_clear", self.session_id, data)
+        self.update_resp(resp)
+
+    def uma_support_card_limit_break_all(self, support_cards):
+        for sc in support_cards:
+            for i in range(sc["stock"]):
+                self.uma_support_card_limit_break(sc["support_card_id"])
+
+    def gacha_is_support(self, gacha_id):
+        if ((gacha_id % 10000) == 3) and ((gacha_id % 2) == 1):
+            return True
+        return False
+
+    def gacha_sc_pulls(self, pulls, well=1):
+        coins = (pulls * 150) * well
+        fcoin = self.uma_info()["fcoin"]
+        times = fcoin % conins
+        DEBUG("To Gacha %d (one: %d)" % (times, conins))
+        for i in range(times):
+            gachas = self.uma_gacha_info()
+            for gacha in gachas:
+                if self.gacha_is_support(gacha["id"]):
+                    for j in range(well):
+                        self.uma_gacha_exec(gachap=["id"], pulls, fcoin)
+                        fcoin -= (pulls * 150)
+
+    def uma_gacha_strategy_one(self):
+        # one well to support card gacha
+        self.gacha_sc_pulls(10, 20)
+        self.uma_support_card_limit_break_all()
+        return self.uma_info()
+
+    def uma_gacha_strategy_two(self):
+        # 10 pulls to support card gacha
+        self.gacha_sc_ten_pulls(10)
+        self.uma_support_card_limit_break_all()
+        return self.uma_info()
+
+    def uma_gacha_strategy_three(self):
+        # first ten pull, later one pull
+        self.gacha_sc_pulls(10)
+        self.gacha_sc_pulls(1)
+        self.uma_support_card_limit_break_all()
+        return self.uma_info()
+
