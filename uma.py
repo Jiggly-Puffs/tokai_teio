@@ -54,6 +54,8 @@ class Teio(object):
         INFO("fcoin %d" % info["fcoin"])
         pp = pprint.PrettyPrinter(indent=4)
         pp.pprint(info["support_card_list"])
+        derby.uma_account_trans("abcABC123")
+
 
 if __name__ == "__main__":
     # test

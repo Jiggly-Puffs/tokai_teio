@@ -107,6 +107,7 @@ class Derby(object):
         self.firebase = data["firebase"]
         self.viewer_id = self.device_info["viewer_id"]
         self.auth_key = base64.b64decode(data["auth_key"])
+        self.password = data.get("password", ""):
         self.gen_session_id()
 
     def tojson(self):
@@ -115,6 +116,7 @@ class Derby(object):
         data["device_info"] = self.device_info
         data["firebase"] = self.firebase
         data["auth_key"] = base64.b64encode(self.auth_key).decode("utf8")
+        data["password"] = self.password
         return json.dumps(data)
 
     def set_name_sex(self, name, sex):
@@ -156,6 +158,7 @@ class Derby(object):
         self.gen_device_info()
         self.firebase = {}
         self.auth_key = None
+        self.password = ""
 
     def omotenashi(self):
         from omotenashi.omotenashi import Omotenashi
@@ -198,23 +201,7 @@ class Derby(object):
         info = {}
         info["fcoin"] = data["coin_info"]["fcoin"]
         info["card_list"] = data["card_list"]
-        '''
-        'card_id': 105601,
-        'rarity': 1,
-        'talent_level': 1,
-        'create_time': '2021-05-27 21:28:56'
-        '''
         info["support_card_list"] = data["support_card_list"]
-        '''
-        'viewer_id': 219420285,
-        'support_card_id': 10001,
-        'exp': 60,
-        'limit_break_count': 0,
-        'favorite_flag': 0,
-        'stock': 0,
-        'possess_time': '2021-05-27 17:53:18',
-        'create_time': '2021-05-27 17:53:18'
-        '''
         INFO("FCOIN %d" % info["fcoin"])
         return info
 
@@ -346,8 +333,8 @@ class Derby(object):
         self.update_resp(resp)
 
     def uma_chara_story(self, episode_id):
-        data["episode_id"] = episode_id
         data = self.device_info.copy()
+        data["episode_id"] = episode_id
         resp = self.proto.run("/character_story/first_clear", self.session_id, data)
         self.update_resp(resp)
 
@@ -398,4 +385,11 @@ class Derby(object):
         self.gacha_sc_pulls(1)
         self.uma_support_card_limit_break_all()
         return self.uma_info()
+
+    def uma_account_trans(self, password):
+        self.password = password
+        data = self.device_info.copy()
+        data["password"] = md5((password+"r!I@mt8e5i=").encode("utf8")).hexdigest()
+        resp = self.proto.run("/account/publish_transition_code", self.session_id, data)
+        self.update_resp(resp)
 
