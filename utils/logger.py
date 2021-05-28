@@ -6,6 +6,10 @@ LOG_LEVEL = 3
 FILELOG = False
 LOGFILE = ""
 
+def SET_LOG_LEVEL(level):
+    global LOG_LEVEL
+    LOG_LEVEL = level
+
 def LOG(level, color, formatStr, *arg):
     if arg:
         if FILELOG:

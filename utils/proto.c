@@ -273,13 +273,13 @@ int main(int argc, char **argv)
     FILE *fp;
 
     if (atoi(argv[1]) == 0) {
-        printf("Enc request...\n");
+        //printf("Enc request...\n");
         snprintf(tmp, 0x100, "%s/req", argv[2]);
         fp = fopen(tmp, "r");
         size_t size = fread(input, 1, 0x3000, fp);
         compress(input, size, argv[2]);
     } else {
-        printf("Dec response...\n");
+        //printf("Dec response...\n");
         snprintf(tmp, 0x100, "%s/resp", argv[2]);
         fp = fopen(tmp, "r");
         size_t size = fread(input, 1, 0x3000, fp);

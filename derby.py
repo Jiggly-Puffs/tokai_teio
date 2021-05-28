@@ -3,6 +3,7 @@
 import os
 import sys
 import uuid
+import time
 import json
 import base64
 import random
@@ -19,7 +20,7 @@ from utils.logger import *
 
 UMA_URL = "https://api-umamusume.cygames.jp/umamusume"
 APP_VER = "1.4.0"
-RES_VER = "10001420:TSVRrfC372gH"
+RES_VER = "10001520:TdKTHfQLd73S"
 UMA_PUBKEY = "6b20e2ab6c311330f761d737ce3f3025750850665eea58b6372f8d2f57501eb348ee86c2de2699100d32f9e07dbfccb9a8fe658b"
 
 USER_AGENT = "Mozilla/5.0 (Linux; Android 10; SM-A102U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.72 Mobile Safari/537.36"
@@ -77,7 +78,12 @@ class UmaProto(object):
         DEBUG("Headers: %s" % str(headers))
         DEBUG("Req: %s" % data)
         req = self.con_req(data, session_id)
-        r = requests.post(url, data=req, headers=headers)
+        while True:
+            try:
+                r = requests.post(url, data=req, headers=headers)
+                break
+            except Exception as e:
+                WARN(str(e))
         if r.status_code != 200:
             ERROR("url: %s\n Error code: %d" % (url, r.status_code))
         resp = msgpack.unpackb(self.decompress(r.text))
@@ -182,13 +188,10 @@ class Derby(object):
                 if data["resource_version"] != RES_VER:
                     RES_VER = data["resource_version"]
                     WARN("NEW RES-VER: %s" % RES_VER)
+        #time.sleep(1) # avoid machine detect
 
     def parse_gacha(self, resp):
-        gachas = resp["data"]["gacha_info_list"]
-        gacha_id = []
-        for gacha in gachas:
-            gacha_id.append(gacha["id"])
-        return gacha_id
+        return resp["data"]["gacha_info_list"]
 
     def parse_info(self, resp):
         data = resp["data"]
@@ -325,13 +328,14 @@ class Derby(object):
         return self.parse_gacha(resp)
 
     def uma_gacha_exec(self, gacha_id, num, fcoin):
-        data = self.device_info_copy()
+        data = self.device_info.copy()
         data["gacha_id"] = gacha_id
         data["draw_type"] = 1
         data["draw_num"] = num
         data["current_num"] = fcoin
         data["item_id"] = 0
         resp = self.proto.run("/gacha/exec", self.session_id, data)
+        self.update_resp(resp)
 
     def uma_support_card_limit_break(self, support_card_id):
         DEBUG("Support card %d limit break" % support_card_id)
@@ -347,28 +351,34 @@ class Derby(object):
         resp = self.proto.run("/character_story/first_clear", self.session_id, data)
         self.update_resp(resp)
 
-    def uma_support_card_limit_break_all(self, support_cards):
+    def uma_support_card_limit_break_all(self):
+        support_cards = self.uma_info()["support_card_list"]
         for sc in support_cards:
             for i in range(sc["stock"]):
+                if i + sc["limit_break_count"] > 4:
+                    break
                 self.uma_support_card_limit_break(sc["support_card_id"])
+                time.sleep(1) # otherwise will trigger 208 fault ( DOUBLE_CLICK_ERROR )
 
-    def gacha_is_support(self, gacha_id):
-        if ((gacha_id % 10000) == 3) and ((gacha_id % 2) == 1):
-            return True
-        return False
+    def gacha_find_sc_pool(self, gachas):
+        for gacha in gachas:
+            if ((gacha["id"] // 10000) == 3) and ((gacha["id"] % 2) == 1):
+                return gacha["id"]
+        return None
 
     def gacha_sc_pulls(self, pulls, well=1):
         coins = (pulls * 150) * well
         fcoin = self.uma_info()["fcoin"]
-        times = fcoin % conins
-        DEBUG("To Gacha %d (one: %d)" % (times, conins))
-        for i in range(times):
-            gachas = self.uma_gacha_info()
-            for gacha in gachas:
-                if self.gacha_is_support(gacha["id"]):
-                    for j in range(well):
-                        self.uma_gacha_exec(gachap=["id"], pulls, fcoin)
-                        fcoin -= (pulls * 150)
+        times = fcoin // coins
+        INFO("To Gacha %d (one: %d)" % (times, coins))
+        gachas = self.uma_gacha_info()
+        gacha_id = self.gacha_find_sc_pool(gachas)
+        if gacha_id:
+            for i in range(times):
+                for j in range(well):
+                    self.uma_gacha_exec(gacha_id, pulls, fcoin)
+                    fcoin -= (pulls * 150)
+                    time.sleep(3) # otherwise will trigger 208 fault ( DOUBLE_CLICK_ERROR )
 
     def uma_gacha_strategy_one(self):
         # one well to support card gacha
