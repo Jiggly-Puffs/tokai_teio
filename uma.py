@@ -3,6 +3,7 @@
 import os
 import sys
 import json
+import time
 import pprint
 from derby import Derby
 from utils.logger import *
@@ -26,8 +27,8 @@ class Teio(object):
     def save(self, data):
         open(self.path, "a+").write(data+"\n")
 
-    def training(self):
-        INFO("Training uma")
+    def daily(self):
+        INFO("Daily uma")
         fp = open(self.path, "r")
         for line in fp.readlines():
             data = json.loads(line)
@@ -36,7 +37,6 @@ class Teio(object):
             derby.uma_daily()
             info = derby.uma_info()
             INFO("fcoin %d" % info["fcoin"])
-            INFO("sc: %s" % (str(info["support_card_list"])))
             print()
 
     def gacha(self):
@@ -56,6 +56,12 @@ class Teio(object):
         pp.pprint(info["support_card_list"])
         derby.uma_account_trans("abcABC123")
 
+    def batch_breeding(self, num):
+        SET_LOG_LEVEL(2)  # info
+        for i in range(num):
+            self.breeding()
+            time.sleep(5)
+
 
 if __name__ == "__main__":
     # test
@@ -64,5 +70,6 @@ if __name__ == "__main__":
     #teio.breeding()
     #teio.training()
     #teio.gacha()
-    teio.test()
+    #teio.test()
+    teio.batch_breeding(50)
 

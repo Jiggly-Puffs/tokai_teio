@@ -84,6 +84,7 @@ class UmaProto(object):
                 break
             except Exception as e:
                 WARN(str(e))
+                time.sleep(1)
         if r.status_code != 200:
             ERROR("url: %s\n Error code: %d" % (url, r.status_code))
         resp = msgpack.unpackb(self.decompress(r.text))
@@ -107,7 +108,7 @@ class Derby(object):
         self.firebase = data["firebase"]
         self.viewer_id = self.device_info["viewer_id"]
         self.auth_key = base64.b64decode(data["auth_key"])
-        self.password = data.get("password", ""):
+        self.password = data.get("password", "")
         self.gen_session_id()
 
     def tojson(self):
