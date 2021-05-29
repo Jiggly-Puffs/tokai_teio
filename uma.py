@@ -30,15 +30,15 @@ class Teio(object):
 
     def daily(self):
         logger.info("Daily uma")
-        fp = open(self.path, "r")
-        for line in fp.readlines():
-            data = json.loads(line)
-            derby = Derby(data)
-            derby.uma_login()
-            derby.uma_daily()
-            info = derby.uma_info()
-            logger.info("fcoin %d" % info["fcoin"])
-            print()
+        with open(self.path, "r") as fp:
+            for line in fp.readlines():
+                data = json.loads(line)
+                derby = Derby(data)
+                derby.uma_login()
+                derby.uma_daily()
+                info = derby.uma_info()
+                logger.info("fcoin %d" % info["fcoin"])
+                print()
 
     def gacha(self):
         derby = self.breeding()
