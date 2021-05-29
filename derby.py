@@ -15,7 +15,8 @@ import secrets
 import requests
 from hashlib import md5
 
-from utils.logger import *
+import logging
+logger = logging.getLogger(__name__)
 
 
 UMA_URL = "https://api-umamusume.cygames.jp/umamusume"
@@ -73,20 +74,20 @@ class UmaProto(object):
 
     def run(self, url, session_id, data):
         url = UMA_URL + url
-        INFO("URL: %s" % url)
+        logger.info("URL: %s" % url)
         headers = self.con_headers(session_id)
-        DEBUG("Headers: %s" % str(headers))
-        DEBUG("Req: %s" % data)
+        logger.debug("Headers: %s" % str(headers))
+        logger.debug("Req: %s" % data)
         req = self.con_req(data, session_id)
         while True:
             try:
                 r = requests.post(url, data=req, headers=headers)
                 break
             except Exception as e:
-                WARN(str(e))
+                logger.warning(str(e))
                 time.sleep(1)
         if r.status_code != 200:
-            ERROR("url: %s\n Error code: %d" % (url, r.status_code))
+            logger.error("url: %s\n Error code: %d" % (url, r.status_code))
         resp = msgpack.unpackb(self.decompress(r.text))
         return resp
 
@@ -152,7 +153,7 @@ class Derby(object):
     def uma_init(self):
         self.viewer_id = 0
         self.app_viewer_id = str(uuid.uuid4())
-        DEBUG("app_viewer_id: %s" % self.app_viewer_id)
+        logger.debug("app_viewer_id: %s" % self.app_viewer_id)
         self.gen_session_id()
         self.name = ''.join(random.choice(string.ascii_lowercase) for i in range(random.randint(3, 10)))
         self.sex = random.randint(1, 2)
@@ -170,9 +171,9 @@ class Derby(object):
             omo.register()
 
     def update_resp(self, resp):
-        DEBUG("RESP: %s" % str(resp))
+        logger.debug("RESP: %s" % str(resp))
         if resp["response_code"] != 1:
-            ERROR("ERROR RESPONSE_CODE %s!!!" % resp["response_code"])
+            logger.error("ERROR RESPONSE_CODE %s!!!" % resp["response_code"])
         if resp.get("data_headers"):
             data_headers = resp["data_headers"]
             if data_headers.get("sid"):
@@ -191,7 +192,7 @@ class Derby(object):
                 global RES_VER
                 if data["resource_version"] != RES_VER:
                     RES_VER = data["resource_version"]
-                    WARN("NEW RES-VER: %s" % RES_VER)
+                    logger.warning("NEW RES-VER: %s" % RES_VER)
         #time.sleep(1) # avoid machine detect
 
     def parse_gacha(self, resp):
@@ -203,7 +204,7 @@ class Derby(object):
         info["fcoin"] = data["coin_info"]["fcoin"]
         info["card_list"] = data["card_list"]
         info["support_card_list"] = data["support_card_list"]
-        INFO("FCOIN %d" % info["fcoin"])
+        logger.info("FCOIN %d" % info["fcoin"])
         return info
 
     def parse_mission(self, resp):
@@ -326,7 +327,7 @@ class Derby(object):
         self.update_resp(resp)
 
     def uma_support_card_limit_break(self, support_card_id):
-        DEBUG("Support card %d limit break" % support_card_id)
+        logger.debug("Support card %d limit break" % support_card_id)
         data = self.device_info.copy()
         data["support_card_id"] = support_card_id
         data["material_support_card_num"] = 1
@@ -358,7 +359,7 @@ class Derby(object):
         coins = (pulls * 150) * well
         fcoin = self.uma_info()["fcoin"]
         times = fcoin // coins
-        INFO("To Gacha %d (one: %d)" % (times, coins))
+        logger.info("To Gacha %d (one: %d)" % (times, coins))
         gachas = self.uma_gacha_info()
         gacha_id = self.gacha_find_sc_pool(gachas)
         if gacha_id:

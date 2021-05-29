@@ -9,9 +9,10 @@ import codecs
 import base64
 import secrets
 import requests
-from utils.logger import *
 from omotenashi import checkin_pb2
 from datetime import datetime, timezone
+import logging
+logger = logging.getLogger(__name__)
 
 
 class Omotenashi(object):
@@ -22,13 +23,13 @@ class Omotenashi(object):
         self.firebase = firebase
 
     def register(self):
-        INFO("Register Omotenashi...")
+        logger.info("Register Omotenashi...")
         self.register_session()
         self.register_firebase()
         self.register_event()
 
     def update(self):
-        INFO("Update Omotenashi...")
+        logger.info("Update Omotenashi...")
         self.register_session()
         self.refresh_token()
         self.register_event()
@@ -52,10 +53,10 @@ class Omotenashi(object):
         OMO_DATA = {
             "ID": "e9ddb9e3dbe41bda26f02bd294927078",
         }
-        DEBUG("register session: %s" % OMO_URL)
+        logger.debug("register session: %s" % OMO_URL)
         r = requests.post(OMO_URL, data=OMO_DATA, headers=OMO_HEADERS)
         if r.status_code != 200:
-            ERROR("register session failed")
+            logger.error("register session failed")
 
     def register_firebase(self):
         FIRE_URL = "https://firebaseinstallations.googleapis.com/v1/projects/gallop-28588356/installations"
@@ -77,8 +78,8 @@ class Omotenashi(object):
         }
         r = requests.post(FIRE_URL, data=json.dumps(FIRE_DATA), headers=FIRE_HEADERS)
         if r.status_code != 200:
-            ERROR("register firebase failed")
-        DEBUG(r.text)
+            logger.error("register firebase failed")
+        logger.debug(r.text)
         con = json.loads(r.text)
 
         self.firebase["fid"] = con["fid"]
@@ -94,7 +95,7 @@ class Omotenashi(object):
         exptime = json.loads(base64.b64decode(data+"="*(4-(len(data)%4))))["exp"]
         now = int(time.time())
         if now < exptime:
-            INFO("Token is still effective")
+            logger.info("Token is still effective")
             return
 
         FIRE_URL = "https://firebaseinstallations.googleapis.com/v1/projects/gallop-28588356/installations" + "/" + self.firebase["fid"] + "/authTokens:generate"
@@ -115,8 +116,8 @@ class Omotenashi(object):
         }
         r = requests.post(FIRE_URL, data=json.dumps(FIRE_DATA), headers=FIRE_HEADERS)
         if r.status_code != 200:
-            ERROR("register firebase failed")
-        DEBUG(r.text)
+            logger.error("register firebase failed")
+        logger.debug(r.text)
         con = json.loads(r.text)
 
         self.firebase["auth_token"] = con["token"]
@@ -165,7 +166,7 @@ class Omotenashi(object):
             self.firebase["security_token"] = str(cresp.securityToken)
             self.firebase["version_info"] = cresp.versionInfo
         else:
-            ERROR("Google checkin failed %s" % r.text)
+            logger.error("Google checkin failed %s" % r.text)
 
     def get_token(self):
         FCM_URL = "https://android.clients.google.com/c2dm/register3"
@@ -198,11 +199,11 @@ class Omotenashi(object):
         }
         r = requests.post(FCM_URL, data=FCM_DATA, headers=FCM_HEADERS)
         if r.status_code != 200:
-            ERROR("Google get token failed")
+            logger.error("Google get token failed")
         if 'Error' in r.text:
-            ERROR("Google get token failed")
+            logger.error("Google get token failed")
         self.token = r.text.split("=")[1]
-        DEBUG("Get token: %s" % self.token)
+        logger.debug("Get token: %s" % self.token)
 
     def unregister_firebase(self):
         FIRE_URL = "https://firebaseinstallations.googleapis.com/v1/projects/gallop-28588356/installations" + "/" + self.firebase["fid"]
@@ -218,8 +219,8 @@ class Omotenashi(object):
         }
         r = requests.delete(FIRE_URL, headers=FIRE_HEADERS)
         if r.status_code != 200:
-            ERROR("firebase unregister failed")
-        DEBUG(r.text)
+            logger.error("firebase unregister failed")
+        logger.debug(r.text)
 
     def register_event(self):
         now = datetime.now(timezone.utc).astimezone(pytz.timezone('Asia/Tokyo')).strftime('%Y-%m-%d %H:%M:%S')
@@ -251,10 +252,16 @@ class Omotenashi(object):
         }
         r = requests.post(OMO_URL, data=OMO_DATA, headers=OMO_HEADERS)
         if r.status_code != 200:
-            ERROR("register event failed")
+            logger.error("register event failed")
 
 
 if __name__ == "__main__":
+    import coloredlogs
+    coloredlogs.install(logging.DEBUG)
+
+    import dotenv
+    dotenv.load_dotenv() # install .env into os.env
+
     app_viewer_id = str(uuid.uuid4())
     omo = Omotenashi(app_viewer_id, "1.3.2")
     omo.register()
