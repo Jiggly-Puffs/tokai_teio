@@ -204,7 +204,7 @@ class Derby(object):
         info["fcoin"] = data["coin_info"]["fcoin"]
         info["card_list"] = data["card_list"]
         info["support_card_list"] = data["support_card_list"]
-        logger.info("FCOIN %d" % info["fcoin"])
+        #logger.info("FCOIN %d" % info["fcoin"])
         return info
 
     def parse_mission(self, resp):
@@ -344,7 +344,8 @@ class Derby(object):
         support_cards = self.uma_info()["support_card_list"]
         for sc in support_cards:
             for i in range(sc["stock"]):
-                if i + sc["limit_break_count"] > 4:
+                if i + sc["limit_break_count"] >= 4:
+                    logging.warn("support card %d: %d" % (sc["support_card_id"], sc["stock"]+sc["limit_break_count"]+1))
                     break
                 self.uma_support_card_limit_break(sc["support_card_id"])
                 time.sleep(1) # otherwise will trigger 208 fault ( DOUBLE_CLICK_ERROR )
