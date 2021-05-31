@@ -386,8 +386,24 @@ class Derby(object):
         # first ten pull, later one pull
         self.gacha_sc_pulls(10)
         self.gacha_sc_pulls(1)
-        self.uma_support_card_limit_break_all()
+        #self.uma_support_card_limit_break_all()
         return self.uma_info()
+
+    def uma_gacha_strategy_four(self):
+        # single pull
+        self.gacha_sc_pulls(1)
+        #self.uma_support_card_limit_break_all()
+        return self.uma_info()
+
+    def uma_gacha_strategy(self, mode):
+        if mode == 1:
+            return self.uma_gacha_strategy_one()
+        elif mode == 2:
+            return self.uma_gacha_strategy_two()
+        elif mode == 3:
+            return self.uma_gacha_strategy_three()
+        else:
+            return self.uma_gacha_strategy_four()
 
     def uma_account_trans(self, password):
         self.password = password

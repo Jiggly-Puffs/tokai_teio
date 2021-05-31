@@ -70,7 +70,7 @@ class Teio(object):
             self.breeding()
             time.sleep(3)
 
-    def gacha(self):
+    def gacha_login(self):
         num = 1
         with open(self.path, "r") as fp:
             for line in fp.readlines():
@@ -78,25 +78,34 @@ class Teio(object):
                 data = json.loads(line)
                 derby = Derby(data)
                 derby.uma_login()
-                derby.uma_daily()
-                info = derby.uma_gacha_strategy_three()
-                sr = 0
-                ssr = 0
-                for sc in info["support_card_list"]:
-                    if sc["support_card_id"] > 20000:
-                        if sc["support_card_id"] > 30000:
-                            ssr += sc["limit_break_count"] + sc["stock"]
-                        else:
-                            sr += sc["limit_break_count"] + sc["stock"]
-                logger.info("SSR: %d, SR: %d" % (ssr, sr))
-                if ssr >= 6:
-                    for sc in info["support_card_list"]:
-                        if sc["support_card_id"] > 30000:
-                            logger.info("%s" % str(sc))
+                #derby.uma_daily()
+                info = derby.uma_gacha_strategy(3)
+                self.parse_gacha_info(info)
                 num += 1
                 if num > 50:
                     break
 
+    def parse_gacha_info(self, info):
+        sr = 0
+        ssr = 0
+        for sc in info["support_card_list"]:
+            if sc["support_card_id"] > 20000:
+                if sc["support_card_id"] > 30000:
+                    ssr += sc["limit_break_count"] + sc["stock"] + 1
+                else:
+                    sr += sc["limit_break_count"] + sc["stock"] + 1
+        logger.info("SSR: %d, SR: %d" % (ssr, sr))
+        if ssr >= 6:
+            for sc in info["support_card_list"]:
+                if sc["support_card_id"] > 30000:
+                    logger.info("%s" % str(sc))
+
+    def gacha_signup(self, num):
+        for i in range(num):
+            logger.info("Breeding uma %d" % (i+1))
+            derby = self.breeding()
+            info = derby.uma_gacha_strategy(4)
+            self.parse_gacha_info(info)
 
 
 if __name__ == "__main__":
@@ -110,7 +119,8 @@ if __name__ == "__main__":
 
     teio = Teio()
     #teio.training()
-    teio.gacha()
+    #teio.gacha_login()
+    teio.gacha_signup(10)
     #teio.test()
     #teio.batch_breeding(50)
     #teio.daily()
