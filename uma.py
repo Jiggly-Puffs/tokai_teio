@@ -10,10 +10,13 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+class UmaException(Exception):
+    pass
+
 class ShutdownHandler(logging.StreamHandler):
     def emit(self, record):
         if record.levelno >= logging.ERROR:
-            sys.exit(1)
+            raise UmaException("Uma Error")
 
 
 class Teio(object):
@@ -22,13 +25,16 @@ class Teio(object):
         self.path = "data/derby.json"
 
     def breeding(self, name=None, sex=None):
-        derby = Derby()
-        derby.uma_signup()
-        if name or sex:
-            derby.set_name_sex(name, sex)
-        derby.uma_daily()
-        self.save(derby.tojson())
-        return derby
+        try:
+            derby = Derby()
+            derby.uma_signup()
+            if name or sex:
+                derby.set_name_sex(name, sex)
+            derby.uma_daily()
+            self.save(derby.tojson())
+            return derby
+        except UmaException:
+            pass
 
     def save(self, data):
         open(self.path, "a+").write(data+"\n")
@@ -120,8 +126,10 @@ if __name__ == "__main__":
     teio = Teio()
     #teio.training()
     #teio.gacha_login()
-    teio.gacha_signup(10)
+    #teio.gacha_signup(10)
     #teio.test()
-    #teio.batch_breeding(50)
+    for i in range(100):
+        teio.batch_breeding(100)
+        time.sleep(600)
     #teio.daily()
 
