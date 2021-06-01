@@ -128,8 +128,8 @@ if __name__ == "__main__":
     #teio.gacha_login()
     #teio.gacha_signup(10)
     #teio.test()
-    for i in range(100):
-        teio.batch_breeding(100)
+    for i in range(10):
+        teio.batch_breeding(500)
         time.sleep(600)
     #teio.daily()
 

@@ -14,6 +14,7 @@ import msgpack
 import secrets
 import requests
 from hashlib import md5
+from utils.resp import RESPCODE
 
 import logging
 logger = logging.getLogger(__name__)
@@ -29,8 +30,9 @@ USER_AGENT = "Mozilla/5.0 (Linux; Android 10; SM-A102U) AppleWebKit/537.36 (KHTM
 
 class UmaProto(object):
 
-    def __init__(self, cert_uuid, viewer_id=0, auth_key=None):
+    def __init__(self, cert_uuid, session_id, viewer_id=0, auth_key=None):
         self.cert_uuid = cert_uuid
+        self.session_id = session_id
         self.viewer_id = viewer_id
         self.auth_key = auth_key
 
@@ -40,9 +42,9 @@ class UmaProto(object):
     def set_auth_key(self, auth_key):
         self.auth_key = auth_key
 
-    def con_req(self, req, session_id):
+    def con_req(self, req):
         data = codecs.decode(UMA_PUBKEY, "hex")
-        data += session_id
+        data += self.session_id
         data += self.cert_uuid
         data += secrets.token_bytes(32)
         if self.auth_key:
@@ -61,9 +63,9 @@ class UmaProto(object):
         os.system("./utils/proto 1 tmp")
         return open("tmp/resp.dec", "rb").read()
 
-    def con_headers(self, session_id):
+    def con_headers(self):
         headers = {
-            "SID": session_id.hex(),
+            "SID": self.session_id.hex(),
             "APP-VER": APP_VER,
             "RES-VER": RES_VER,
             "Content-Type": "application/x-msgpack",
@@ -72,13 +74,22 @@ class UmaProto(object):
         }
         return headers
 
-    def run(self, url, session_id, data):
+    def update_session_id(self, resp):
+        logger.debug("RESP: %s" % str(resp))
+        if resp["response_code"] != 1:
+            logger.error("ERROR RESPONSE_CODE %s: %s!!!" % (resp["response_code"], RESPCODE(resp["response_code"]).name))
+        if resp.get("data_headers"):
+            data_headers = resp["data_headers"]
+            if data_headers.get("sid"):
+                self.session_id = md5(data_headers.get("sid").encode("utf8") + b'r!I@mt8e5i=').digest()
+
+    def run(self, url, data):
         url = UMA_URL + url
         logger.info("URL: %s" % url)
-        headers = self.con_headers(session_id)
+        headers = self.con_headers()
         logger.debug("Headers: %s" % str(headers))
         logger.debug("Req: %s" % data)
-        req = self.con_req(data, session_id)
+        req = self.con_req(data)
         while True:
             try:
                 r = requests.post(url, data=req, headers=headers)
@@ -89,6 +100,7 @@ class UmaProto(object):
         if r.status_code != 200:
             logger.error("url: %s\n Error code: %d" % (url, r.status_code))
         resp = msgpack.unpackb(self.decompress(r.text))
+        self.update_session_id(resp)
         return resp
 
 
@@ -100,7 +112,7 @@ class Derby(object):
         else:
             self.uma_init()  # generate a new account
 
-        self.proto = UmaProto(self.cert_uuid, self.viewer_id, self.auth_key)
+        self.proto = UmaProto(self.cert_uuid, self.session_id, self.viewer_id, self.auth_key)
         #self.omotenashi()
 
     def load(self, data):
@@ -170,14 +182,7 @@ class Derby(object):
         else:
             omo.register()
 
-    def update_resp(self, resp):
-        logger.debug("RESP: %s" % str(resp))
-        if resp["response_code"] != 1:
-            logger.error("ERROR RESPONSE_CODE %s!!!" % resp["response_code"])
-        if resp.get("data_headers"):
-            data_headers = resp["data_headers"]
-            if data_headers.get("sid"):
-                self.session_id = md5(data_headers.get("sid").encode("utf8") + b'r!I@mt8e5i=').digest()
+    def parse_signup_info(self, resp):
         if resp.get("data"):
             data = resp["data"]
             if data.get("viewer_id"):
@@ -188,12 +193,15 @@ class Derby(object):
             if data.get("auth_key"):
                 self.auth_key = base64.b64decode(data["auth_key"])
                 self.proto.set_auth_key(self.auth_key)
+
+    def parse_res_ver(self, resp):
+        if resp.get("data"):
+            data = resp["data"]
             if data.get("resource_version"):
                 global RES_VER
                 if data["resource_version"] != RES_VER:
                     RES_VER = data["resource_version"]
                     logger.warning("NEW RES-VER: %s" % RES_VER)
-        #time.sleep(1) # avoid machine detect
 
     def parse_gacha(self, resp):
         return resp["data"]["gacha_info_list"]
@@ -219,68 +227,58 @@ class Derby(object):
 
     def uma_signup(self):
         data = self.device_info.copy()
-        resp = self.proto.run("/tool/pre_signup", self.session_id, data)
-        self.update_resp(resp)
+        resp = self.proto.run("/tool/pre_signup", data)
 
         data = self.device_info.copy()
         data["credential"] = ""
         data["error_code"] = 0
         data["error_message"] = ""
-        resp = self.proto.run("/tool/signup", self.session_id, data)
-        self.update_resp(resp)
+        resp = self.proto.run("/tool/signup", data)
+        self.parse_signup_info(resp)
 
         data = self.device_info.copy()
-        resp = self.proto.run("/tool/start_session", self.session_id, data)
-        self.update_resp(resp)
+        resp = self.proto.run("/tool/start_session", data)
+        self.parse_res_ver(resp)
 
         data = self.device_info.copy()
-        resp = self.proto.run("/load/index", self.session_id, data)
-        self.update_resp(resp)
+        resp = self.proto.run("/load/index", data)
 
         data = self.device_info.copy()
         data["name"] = self.name
-        resp = self.proto.run("/user/change_name", self.session_id, data)
-        self.update_resp(resp)
+        resp = self.proto.run("/user/change_name", data)
 
         data = self.device_info.copy()
         data["sex"] = self.sex
-        resp = self.proto.run("/user/change_sex", self.session_id, data)
-        self.update_resp(resp)
+        resp = self.proto.run("/user/change_sex", data)
 
         data = self.device_info.copy()
-        resp = self.proto.run("/tutorial/skip", self.session_id, data)
-        self.update_resp(resp)
+        resp = self.proto.run("/tutorial/skip", data)
 
     def uma_daily(self):
 
         data = self.device_info.copy()
-        resp = self.proto.run("/load/index", self.session_id, data)
-        self.update_resp(resp)
+        resp = self.proto.run("/load/index", data)
 
         data = self.device_info.copy()
-        resp = self.proto.run("/payment/item_list", self.session_id, data)
-        self.update_resp(resp)
+        resp = self.proto.run("/payment/item_list", data)
 
         data = self.device_info.copy()
         data["log_key"] = 3
         data["log_message"] = "Google Play In-app Billing API version is less than 3"
-        resp = self.proto.run("/payment/send_log", self.session_id, data)
-        self.update_resp(resp)
+        resp = self.proto.run("/payment/send_log", data)
 
         self.uma_receive_gifts()
 
     def uma_receive_gifts(self):
         # get mission & receive mission_gift
         data = self.device_info.copy()
-        resp = self.proto.run("/mission/index", self.session_id, data)
-        self.update_resp(resp)
+        resp = self.proto.run("/mission/index", data)
         missions = self.parse_mission(resp)
 
         if missions:
             data = self.device_info.copy()
             data['mission_id_array'] = missions
-            resp = self.proto.run("/mission/receive", self.session_id, data)
-            self.update_resp(resp)
+            resp = self.proto.run("/mission/receive", data)
 
         # receive gifts
         data = self.device_info.copy()
@@ -289,31 +287,27 @@ class Derby(object):
         data["offset"] = 0
         data["limit"] = 100
         data["is_asc"] = True
-        resp = self.proto.run("/present/index", self.session_id, data)
-        self.update_resp(resp)
+        resp = self.proto.run("/present/index", data)
 
         data = self.device_info.copy()
         data["time_filter_type"] = 0
         data["category_filter_type"] = [0]
         data["is_asc"] = True
-        resp = self.proto.run("/present/receive_all", self.session_id, data)
-        self.update_resp(resp)
+        resp = self.proto.run("/present/receive_all", data)
 
     def uma_info(self):
         data = self.device_info.copy()
-        resp = self.proto.run("/load/index", self.session_id, data)
-        self.update_resp(resp)
+        resp = self.proto.run("/load/index", data)
         return self.parse_info(resp)
 
     def uma_login(self):
         data = self.device_info.copy()
-        resp = self.proto.run("/tool/start_session", self.session_id, data)
-        self.update_resp(resp)
+        resp = self.proto.run("/tool/start_session", data)
+        self.parse_res_ver(resp)
 
     def uma_gacha_info(self):
         data = self.device_info.copy()
-        resp = self.proto.run("/gacha/index", self.session_id, data)
-        self.update_resp(resp)
+        resp = self.proto.run("/gacha/index", data)
         return self.parse_gacha(resp)
 
     def uma_gacha_exec(self, gacha_id, num, fcoin):
@@ -323,22 +317,19 @@ class Derby(object):
         data["draw_num"] = num
         data["current_num"] = fcoin
         data["item_id"] = 0
-        resp = self.proto.run("/gacha/exec", self.session_id, data)
-        self.update_resp(resp)
+        resp = self.proto.run("/gacha/exec", data)
 
     def uma_support_card_limit_break(self, support_card_id):
         logger.debug("Support card %d limit break" % support_card_id)
         data = self.device_info.copy()
         data["support_card_id"] = support_card_id
         data["material_support_card_num"] = 1
-        resp = self.proto.run("/support_card/limit_break", self.session_id, data)
-        self.update_resp(resp)
+        resp = self.proto.run("/support_card/limit_break", data)
 
     def uma_chara_story(self, episode_id):
         data = self.device_info.copy()
         data["episode_id"] = episode_id
-        resp = self.proto.run("/character_story/first_clear", self.session_id, data)
-        self.update_resp(resp)
+        resp = self.proto.run("/character_story/first_clear", data)
 
     def uma_support_card_limit_break_all(self):
         support_cards = self.uma_info()["support_card_list"]
@@ -409,6 +400,5 @@ class Derby(object):
         self.password = password
         data = self.device_info.copy()
         data["password"] = md5((password+"r!I@mt8e5i=").encode("utf8")).hexdigest()
-        resp = self.proto.run("/account/publish_transition_code", self.session_id, data)
-        self.update_resp(resp)
+        resp = self.proto.run("/account/publish_transition_code", data)
 
