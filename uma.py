@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import os
-import sys
+import asyncio
 import json
 import time
 import pprint
@@ -24,22 +23,19 @@ class Teio(object):
     def __init__(self):
         self.path = "data/derby.json"
 
-    def breeding(self, name=None, sex=None):
-        try:
-            derby = Derby()
-            derby.uma_signup()
-            if name or sex:
-                derby.set_name_sex(name, sex)
-            derby.uma_daily()
-            self.save(derby.tojson())
-            return derby
-        except UmaException:
-            pass
+    async def breeding(self, name=None, sex=None) -> Derby:
+        derby = Derby()
+        await derby.uma_signup()
+        if name or sex:
+            derby.set_name_sex(name, sex)
+        await derby.uma_daily()
+        self.save(derby.tojson())
+        return derby
 
     def save(self, data):
         open(self.path, "a+").write(data+"\n")
 
-    def daily(self):
+    async def daily(self):
         logger.info("Daily uma")
         num = 1
         with open(self.path, "r") as fp:
@@ -47,43 +43,43 @@ class Teio(object):
                 logger.info("Uma %d" % num)
                 data = json.loads(line)
                 derby = Derby(data)
-                derby.uma_login()
-                derby.uma_daily()
-                info = derby.uma_info()
+                await derby.uma_login()
+                await derby.uma_daily()
+                info = await derby.uma_info()
                 logger.info("fcoin %d" % info["fcoin"])
                 num += 1
 
-    def test_gacha(self):
-        derby = self.breeding()
-        info = derby.uma_gacha_strategy_three()
+    async def test_gacha(self):
+        derby = await self.breeding()
+        info = await derby.uma_gacha_strategy_three()
         logger.info("sc: %s" % (str(info["support_card_list"])))
 
-    def test(self):
+    async def test(self):
         data = json.loads(open(self.path, "r").readlines()[-1])
         derby = Derby(data)
-        derby.uma_login()
-        derby.uma_daily()
-        derby.uma_support_card_limit_break_all()
-        info = derby.uma_info()
+        await derby.uma_login()
+        await derby.uma_daily()
+        await derby.uma_support_card_limit_break_all()
+        info = await derby.uma_info()
         logger.info("fcoin %d" % info["fcoin"])
         pp = pprint.PrettyPrinter(indent=4)
         pp.pprint(info["support_card_list"])
-        derby.uma_account_trans("abcABC123")
+        await derby.uma_account_trans("abcABC123")
 
-    def batch_breeding(self, num):
+    async def batch_breeding(self, num):
         for i in range(num):
             logger.info("Breeding uma %d" % (i+1))
-            self.breeding()
-            time.sleep(3)
+            await self.breeding()
+            await asyncio.sleep(3)
 
-    def gacha_login(self):
+    async def gacha_login(self):
         num = 1
         with open(self.path, "r") as fp:
             for line in fp.readlines():
                 logger.info("Uma %d" % num)
                 data = json.loads(line)
                 derby = Derby(data)
-                derby.uma_login()
+                await derby.uma_login()
                 #derby.uma_daily()
                 info = derby.uma_gacha_strategy(3)
                 self.parse_gacha_info(info)
@@ -106,13 +102,30 @@ class Teio(object):
                 if sc["support_card_id"] > 30000:
                     logger.info("%s" % str(sc))
 
-    def gacha_signup(self, num):
+    async def gacha_signup(self, num):
         for i in range(num):
             logger.info("Breeding uma %d" % (i+1))
-            derby = self.breeding()
-            info = derby.uma_gacha_strategy(4)
+            derby = await self.breeding()
+            info = await derby.uma_gacha_strategy(4)
             self.parse_gacha_info(info)
 
+async def job():
+    teio = Teio()
+    #teio.training()
+    #teio.gacha_login()
+    #teio.gacha_signup(10)
+    #teio.test()
+    for i in range(10):
+        await teio.batch_breeding(500)
+    #teio.daily()
+
+    
+async def main():
+    jobs = []
+    for i in range(20):
+        jobs.append(job())
+    await asyncio.gather(*jobs)
+        
 
 if __name__ == "__main__":
     # test
@@ -123,13 +136,5 @@ if __name__ == "__main__":
     import dotenv
     dotenv.load_dotenv() # install .env into os.env
 
-    teio = Teio()
-    #teio.training()
-    #teio.gacha_login()
-    #teio.gacha_signup(10)
-    #teio.test()
-    for i in range(10):
-        teio.batch_breeding(500)
-        time.sleep(600)
-    #teio.daily()
+    asyncio.run(main())
 

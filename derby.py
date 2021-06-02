@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 
+import asyncio
 import os
-import sys
+import httpx
 import uuid
-import time
 import json
 import base64
 import random
@@ -12,7 +12,7 @@ import struct
 import codecs
 import msgpack
 import secrets
-import requests
+import tempfile
 from hashlib import md5
 from utils.resp import RESPCODE
 
@@ -35,6 +35,11 @@ class UmaProto(object):
         self.session_id = session_id
         self.viewer_id = viewer_id
         self.auth_key = auth_key
+        self.tmp_dir = tempfile.TemporaryDirectory(prefix="UmaProto")
+        print(self.tmp_dir.name)
+
+    def __del__(self):
+        self.tmp_dir.cleanup()
 
     def set_viewer_id(self, viewer_id):
         self.viewer_id = viewer_id
@@ -54,14 +59,14 @@ class UmaProto(object):
         return self.compress(data)
 
     def compress(self, data):
-        open("tmp/req", "wb").write(data)
-        os.system("./utils/proto 0 tmp")
-        return base64.b64encode(open("tmp/req.enc", "rb").read())
+        open(f"{self.tmp_dir.name}/req", "wb").write(data)
+        os.system(f"./utils/proto 0 {self.tmp_dir.name}")
+        return base64.b64encode(open(f"{self.tmp_dir.name}/req.enc", "rb").read())
 
     def decompress(self, data):
-        open("tmp/resp", "wb").write(base64.b64decode(data.strip()))
-        os.system("./utils/proto 1 tmp")
-        return open("tmp/resp.dec", "rb").read()
+        open(f"{self.tmp_dir.name}/resp", "wb").write(base64.b64decode(data.strip()))
+        os.system(f"./utils/proto 1 {self.tmp_dir.name}")
+        return open(f"{self.tmp_dir.name}/resp.dec", "rb").read()
 
     def con_headers(self):
         headers = {
@@ -83,7 +88,7 @@ class UmaProto(object):
             if data_headers.get("sid"):
                 self.session_id = md5(data_headers.get("sid").encode("utf8") + b'r!I@mt8e5i=').digest()
 
-    def run(self, url, data):
+    async def post(self, url, data):
         url = UMA_URL + url
         logger.info("URL: %s" % url)
         headers = self.con_headers()
@@ -92,11 +97,12 @@ class UmaProto(object):
         req = self.con_req(data)
         while True:
             try:
-                r = requests.post(url, data=req, headers=headers)
+                async with httpx.AsyncClient() as client:
+                    r = await client.post(url, content=req, headers=headers)
                 break
             except Exception as e:
                 logger.warning(str(e))
-                time.sleep(1)
+                await asyncio.sleep(1)
         if r.status_code != 200:
             logger.error("url: %s\n Error code: %d" % (url, r.status_code))
         resp = msgpack.unpackb(self.decompress(r.text))
@@ -129,6 +135,8 @@ class Derby(object):
         data["app_viewer_id"] = self.app_viewer_id
         data["device_info"] = self.device_info
         data["firebase"] = self.firebase
+        
+        assert self.auth_key is not None
         data["auth_key"] = base64.b64encode(self.auth_key).decode("utf8")
         data["password"] = self.password
         return json.dumps(data)
@@ -205,8 +213,9 @@ class Derby(object):
 
     def parse_gacha(self, resp):
         return resp["data"]["gacha_info_list"]
-
-    def parse_info(self, resp):
+    
+    @staticmethod
+    def parse_info(resp):
         data = resp["data"]
         info = {}
         info["fcoin"] = data["coin_info"]["fcoin"]
@@ -215,7 +224,8 @@ class Derby(object):
         #logger.info("FCOIN %d" % info["fcoin"])
         return info
 
-    def parse_mission(self, resp):
+    @staticmethod
+    def parse_mission(resp):
         data = resp["data"]
         m = []
         if data.get("mission_list"):
@@ -225,60 +235,60 @@ class Derby(object):
                     m.append(mis["mission_id"])
         return m
 
-    def uma_signup(self):
+    async def uma_signup(self):
         data = self.device_info.copy()
-        resp = self.proto.run("/tool/pre_signup", data)
+        resp = await self.proto.post("/tool/pre_signup", data)
 
         data = self.device_info.copy()
         data["credential"] = ""
         data["error_code"] = 0
         data["error_message"] = ""
-        resp = self.proto.run("/tool/signup", data)
+        resp = await self.proto.post("/tool/signup", data)
         self.parse_signup_info(resp)
 
         data = self.device_info.copy()
-        resp = self.proto.run("/tool/start_session", data)
+        resp = await self.proto.post("/tool/start_session", data)
         self.parse_res_ver(resp)
 
         data = self.device_info.copy()
-        resp = self.proto.run("/load/index", data)
+        resp = await self.proto.post("/load/index", data)
 
         data = self.device_info.copy()
         data["name"] = self.name
-        resp = self.proto.run("/user/change_name", data)
+        resp = await self.proto.post("/user/change_name", data)
 
         data = self.device_info.copy()
         data["sex"] = self.sex
-        resp = self.proto.run("/user/change_sex", data)
+        resp = await self.proto.post("/user/change_sex", data)
 
         data = self.device_info.copy()
-        resp = self.proto.run("/tutorial/skip", data)
+        resp = await self.proto.post("/tutorial/skip", data)
 
-    def uma_daily(self):
-
-        data = self.device_info.copy()
-        resp = self.proto.run("/load/index", data)
+    async def uma_daily(self):
 
         data = self.device_info.copy()
-        resp = self.proto.run("/payment/item_list", data)
+        resp = await self.proto.post("/load/index", data)
+
+        data = self.device_info.copy()
+        resp = await self.proto.post("/payment/item_list", data)
 
         data = self.device_info.copy()
         data["log_key"] = 3
         data["log_message"] = "Google Play In-app Billing API version is less than 3"
-        resp = self.proto.run("/payment/send_log", data)
+        resp = await self.proto.post("/payment/send_log", data)
 
-        self.uma_receive_gifts()
+        await self.uma_receive_gifts()
 
-    def uma_receive_gifts(self):
+    async def uma_receive_gifts(self):
         # get mission & receive mission_gift
         data = self.device_info.copy()
-        resp = self.proto.run("/mission/index", data)
+        resp = await self.proto.post("/mission/index", data)
         missions = self.parse_mission(resp)
 
         if missions:
             data = self.device_info.copy()
             data['mission_id_array'] = missions
-            resp = self.proto.run("/mission/receive", data)
+            resp = await self.proto.post("/mission/receive", data)
 
         # receive gifts
         data = self.device_info.copy()
@@ -287,69 +297,70 @@ class Derby(object):
         data["offset"] = 0
         data["limit"] = 100
         data["is_asc"] = True
-        resp = self.proto.run("/present/index", data)
+        resp = await self.proto.post("/present/index", data)
 
         data = self.device_info.copy()
         data["time_filter_type"] = 0
         data["category_filter_type"] = [0]
         data["is_asc"] = True
-        resp = self.proto.run("/present/receive_all", data)
+        resp = await self.proto.post("/present/receive_all", data)
 
-    def uma_info(self):
+    async def uma_info(self):
         data = self.device_info.copy()
-        resp = self.proto.run("/load/index", data)
+        resp = await self.proto.post("/load/index", data)
         return self.parse_info(resp)
 
-    def uma_login(self):
+    async def uma_login(self):
         data = self.device_info.copy()
-        resp = self.proto.run("/tool/start_session", data)
+        resp = await self.proto.post("/tool/start_session", data)
         self.parse_res_ver(resp)
 
-    def uma_gacha_info(self):
+    async def uma_gacha_info(self):
         data = self.device_info.copy()
-        resp = self.proto.run("/gacha/index", data)
+        resp = await self.proto.post("/gacha/index", data)
         return self.parse_gacha(resp)
 
-    def uma_gacha_exec(self, gacha_id, num, fcoin):
+    async def uma_gacha_exec(self, gacha_id, num, fcoin):
         data = self.device_info.copy()
         data["gacha_id"] = gacha_id
         data["draw_type"] = 1
         data["draw_num"] = num
         data["current_num"] = fcoin
         data["item_id"] = 0
-        resp = self.proto.run("/gacha/exec", data)
+        resp = await self.proto.post("/gacha/exec", data)
 
-    def uma_support_card_limit_break(self, support_card_id):
+    async def uma_support_card_limit_break(self, support_card_id):
         logger.debug("Support card %d limit break" % support_card_id)
         data = self.device_info.copy()
         data["support_card_id"] = support_card_id
         data["material_support_card_num"] = 1
-        resp = self.proto.run("/support_card/limit_break", data)
+        resp = await self.proto.post("/support_card/limit_break", data)
 
-    def uma_chara_story(self, episode_id):
+    async def uma_chara_story(self, episode_id):
         data = self.device_info.copy()
         data["episode_id"] = episode_id
-        resp = self.proto.run("/character_story/first_clear", data)
+        resp = await self.proto.post("/character_story/first_clear", data)
 
-    def uma_support_card_limit_break_all(self):
-        support_cards = self.uma_info()["support_card_list"]
+    async def uma_support_card_limit_break_all(self):
+        support_cards = (await self.uma_info())["support_card_list"]
         for sc in support_cards:
             for i in range(sc["stock"]):
                 if i + sc["limit_break_count"] >= 4:
                     logging.warn("support card %d: %d" % (sc["support_card_id"], sc["stock"]+sc["limit_break_count"]+1))
                     break
-                self.uma_support_card_limit_break(sc["support_card_id"])
-                time.sleep(1) # otherwise will trigger 208 fault ( DOUBLE_CLICK_ERROR )
+                await self.uma_support_card_limit_break(sc["support_card_id"])
+                await asyncio.sleep(1) # otherwise will trigger 208 fault ( DOUBLE_CLICK_ERROR )
 
-    def gacha_find_sc_pool(self, gachas):
+    @staticmethod 
+    async def gacha_find_sc_pool(gachas):
         for gacha in gachas:
             if ((gacha["id"] // 10000) == 3) and ((gacha["id"] % 2) == 1):
                 return gacha["id"]
         return None
 
-    def gacha_sc_pulls(self, pulls, well=1):
+    async def gacha_sc_pulls(self, pulls, well=1):
         coins = (pulls * 150) * well
-        fcoin = self.uma_info()["fcoin"]
+        fcoin = (await self.uma_info())["fcoin"]
         times = fcoin // coins
         logger.info("To Gacha %d (one: %d)" % (times, coins))
         gachas = self.uma_gacha_info()
@@ -357,34 +368,35 @@ class Derby(object):
         if gacha_id:
             for i in range(times):
                 for j in range(well):
-                    self.uma_gacha_exec(gacha_id, pulls, fcoin)
+                    await self.uma_gacha_exec(gacha_id, pulls, fcoin)
                     fcoin -= (pulls * 150)
-                    time.sleep(3) # otherwise will trigger 208 fault ( DOUBLE_CLICK_ERROR )
+                    await asyncio.sleep(3) # otherwise will trigger 208 fault ( DOUBLE_CLICK_ERROR )
 
-    def uma_gacha_strategy_one(self):
+    async def uma_gacha_strategy_one(self):
         # one well to support card gacha
-        self.gacha_sc_pulls(10, 20)
-        self.uma_support_card_limit_break_all()
-        return self.uma_info()
+        await self.gacha_sc_pulls(10, 20)
+        await self.uma_support_card_limit_break_all()
+        return await self.uma_info()
 
-    def uma_gacha_strategy_two(self):
+    async def uma_gacha_strategy_two(self):
         # 10 pulls to support card gacha
-        self.gacha_sc_ten_pulls(10)
-        self.uma_support_card_limit_break_all()
-        return self.uma_info()
+        # FIXME: no idea how
+        await self.gacha_sc_ten_pulls(10)
+        await self.uma_support_card_limit_break_all()
+        return await self.uma_info()
 
-    def uma_gacha_strategy_three(self):
+    async def uma_gacha_strategy_three(self):
         # first ten pull, later one pull
-        self.gacha_sc_pulls(10)
-        self.gacha_sc_pulls(1)
+        await self.gacha_sc_pulls(10)
+        await self.gacha_sc_pulls(1)
         #self.uma_support_card_limit_break_all()
-        return self.uma_info()
+        return await self.uma_info()
 
-    def uma_gacha_strategy_four(self):
+    async def uma_gacha_strategy_four(self):
         # single pull
-        self.gacha_sc_pulls(1)
+        await self.gacha_sc_pulls(1)
         #self.uma_support_card_limit_break_all()
-        return self.uma_info()
+        return await self.uma_info()
 
     def uma_gacha_strategy(self, mode):
         if mode == 1:
@@ -396,9 +408,9 @@ class Derby(object):
         else:
             return self.uma_gacha_strategy_four()
 
-    def uma_account_trans(self, password):
+    async def uma_account_trans(self, password):
         self.password = password
         data = self.device_info.copy()
         data["password"] = md5((password+"r!I@mt8e5i=").encode("utf8")).hexdigest()
-        resp = self.proto.run("/account/publish_transition_code", data)
+        resp = await self.proto.post("/account/publish_transition_code", data)
 
