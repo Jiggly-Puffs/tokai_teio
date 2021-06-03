@@ -1,0 +1,137 @@
+{
+   "card_list" : [
+      {
+         "card_id" : 100701,
+         "create_time" : "2021-06-04 12:18:28",
+         "rarity" : 2,
+         "talent_level" : 1
+      },
+      {
+         "card_id" : 100801,
+         "create_time" : "2021-06-04 12:18:28",
+         "rarity" : 2,
+         "talent_level" : 1
+      },
+      {
+         "card_id" : 100901,
+         "create_time" : "2021-06-04 12:18:28",
+         "rarity" : 2,
+         "talent_level" : 1
+      },
+      {
+         "card_id" : 104101,
+         "create_time" : "2021-06-04 12:18:28",
+         "rarity" : 1,
+         "talent_level" : 1
+      },
+      {
+         "card_id" : 105201,
+         "create_time" : "2021-06-04 12:18:28",
+         "rarity" : 1,
+         "talent_level" : 1
+      }
+   ],
+   "fcoin" : 9610,
+   "support_card_list" : [
+      {
+         "create_time" : "2021-06-04 12:18:28",
+         "exp" : 60,
+         "favorite_flag" : 0,
+         "limit_break_count" : 0,
+         "possess_time" : "2021-06-04 12:18:28",
+         "stock" : 0,
+         "support_card_id" : 10001,
+         "viewer_id" : 783722630
+      },
+      {
+         "create_time" : "2021-06-04 12:18:28",
+         "exp" : 60,
+         "favorite_flag" : 0,
+         "limit_break_count" : 0,
+         "possess_time" : "2021-06-04 12:18:28",
+         "stock" : 0,
+         "support_card_id" : 10002,
+         "viewer_id" : 783722630
+      },
+      {
+         "create_time" : "2021-06-04 12:18:28",
+         "exp" : 60,
+         "favorite_flag" : 0,
+         "limit_break_count" : 0,
+         "possess_time" : "2021-06-04 12:18:28",
+         "stock" : 0,
+         "support_card_id" : 10003,
+         "viewer_id" : 783722630
+      },
+      {
+         "create_time" : "2021-06-04 12:18:28",
+         "exp" : 0,
+         "favorite_flag" : 0,
+         "limit_break_count" : 0,
+         "possess_time" : "2021-06-04 12:18:28",
+         "stock" : 0,
+         "support_card_id" : 10005,
+         "viewer_id" : 783722630
+      },
+      {
+         "create_time" : "2021-06-04 12:18:28",
+         "exp" : 0,
+         "favorite_flag" : 0,
+         "limit_break_count" : 0,
+         "possess_time" : "2021-06-04 12:18:28",
+         "stock" : 0,
+         "support_card_id" : 10009,
+         "viewer_id" : 783722630
+      },
+      {
+         "create_time" : "2021-06-04 12:18:28",
+         "exp" : 60,
+         "favorite_flag" : 0,
+         "limit_break_count" : 0,
+         "possess_time" : "2021-06-04 12:18:28",
+         "stock" : 0,
+         "support_card_id" : 10010,
+         "viewer_id" : 783722630
+      },
+      {
+         "create_time" : "2021-06-04 12:18:28",
+         "exp" : 0,
+         "favorite_flag" : 0,
+         "limit_break_count" : 0,
+         "possess_time" : "2021-06-04 12:18:28",
+         "stock" : 0,
+         "support_card_id" : 10027,
+         "viewer_id" : 783722630
+      },
+      {
+         "create_time" : "2021-06-04 12:18:28",
+         "exp" : 0,
+         "favorite_flag" : 0,
+         "limit_break_count" : 0,
+         "possess_time" : "2021-06-04 12:18:28",
+         "stock" : 0,
+         "support_card_id" : 10032,
+         "viewer_id" : 783722630
+      },
+      {
+         "create_time" : "2021-06-04 12:18:28",
+         "exp" : 0,
+         "favorite_flag" : 0,
+         "limit_break_count" : 0,
+         "possess_time" : "2021-06-04 12:18:28",
+         "stock" : 0,
+         "support_card_id" : 10049,
+         "viewer_id" : 783722630
+      },
+      {
+         "create_time" : "2021-06-04 12:18:28",
+         "exp" : 60,
+         "favorite_flag" : 0,
+         "limit_break_count" : 0,
+         "possess_time" : "2021-06-04 12:18:28",
+         "stock" : 0,
+         "support_card_id" : 20021,
+         "viewer_id" : 783722630
+      }
+   ]
+}

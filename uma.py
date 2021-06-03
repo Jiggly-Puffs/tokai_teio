@@ -30,6 +30,7 @@ class Teio(object):
             derby.set_name_sex(name, sex)
         await derby.uma_daily()
         self.save(derby.tojson())
+        print(await derby.uma_info())
         return derby
 
     def save(self, data):
@@ -46,6 +47,7 @@ class Teio(object):
                 await derby.uma_login()
                 await derby.uma_daily()
                 info = await derby.uma_info()
+
                 logger.info("fcoin %d" % info["fcoin"])
                 num += 1
 

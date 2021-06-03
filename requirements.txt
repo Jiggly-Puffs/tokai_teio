@@ -2,3 +2,9 @@ msgpack
 coloredlogs
 dotenv-config
 httpx
+sqlalchemy
+sqlalchemy-migrate
+psycopg2-binary
+asyncpg
+aiofiles
+tortoise-orm[asyncpg]

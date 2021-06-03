@@ -395,18 +395,18 @@ class Derby(object):
         # single pull
         await self.gacha_sc_pulls(1)
 
-    def uma_gacha_strategy(self, mode, limit_break=False):
+    async def uma_gacha_strategy(self, mode, limit_break=False):
         if mode == 1:
-            self.uma_gacha_strategy_one()
+            await self.uma_gacha_strategy_one()
         elif mode == 2:
-            self.uma_gacha_strategy_two()
+            await self.uma_gacha_strategy_two()
         elif mode == 3:
-            self.uma_gacha_strategy_three()
+            await self.uma_gacha_strategy_three()
         else:
-            self.uma_gacha_strategy_four()
+            await self.uma_gacha_strategy_four()
 
         if limit_break:
-            self.uma_support_card_limit_break_all()
+            await self.uma_support_card_limit_break_all()
         return await self.uma_info()
 
     async def uma_account_trans(self, password):

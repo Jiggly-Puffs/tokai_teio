@@ -1,0 +1,15 @@
+version: "3.3"
+services:
+  # NOTE: if you want to upgrade database, you can **NOT** change image directly..
+  # You should find the way to migrate the data...
+  hackmd-database:
+    image: postgres:13-alpine
+    environment:
+      - POSTGRES_USER=test
+      - POSTGRES_PASSWORD=test
+      - POSTGRES_DB=test
+    # volumes:
+    # - ./postgresql:/var/lib/postgresql/data
+    restart: always
+    ports:
+            - '127.0.0.1:5432:5432'
