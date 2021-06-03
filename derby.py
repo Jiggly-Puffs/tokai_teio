@@ -135,7 +135,7 @@ class Derby(object):
         data["app_viewer_id"] = self.app_viewer_id
         data["device_info"] = self.device_info
         data["firebase"] = self.firebase
-        
+
         assert self.auth_key is not None
         data["auth_key"] = base64.b64encode(self.auth_key).decode("utf8")
         data["password"] = self.password
@@ -213,7 +213,7 @@ class Derby(object):
 
     def parse_gacha(self, resp):
         return resp["data"]["gacha_info_list"]
-    
+
     @staticmethod
     def parse_info(resp):
         data = resp["data"]
@@ -310,6 +310,11 @@ class Derby(object):
         resp = await self.proto.post("/load/index", data)
         return self.parse_info(resp)
 
+    async def uma_raw_info(self):
+        data = self.device_info.copy()
+        resp = await self.proto.post("/load/index", data)
+        return resp["data"]
+
     async def uma_login(self):
         data = self.device_info.copy()
         resp = await self.proto.post("/tool/start_session", data)
@@ -351,7 +356,7 @@ class Derby(object):
                 await self.uma_support_card_limit_break(sc["support_card_id"])
                 await asyncio.sleep(1) # otherwise will trigger 208 fault ( DOUBLE_CLICK_ERROR )
 
-    @staticmethod 
+    @staticmethod
     async def gacha_find_sc_pool(gachas):
         for gacha in gachas:
             if ((gacha["id"] // 10000) == 3) and ((gacha["id"] % 2) == 1):
@@ -375,42 +380,37 @@ class Derby(object):
     async def uma_gacha_strategy_one(self):
         # one well to support card gacha
         await self.gacha_sc_pulls(10, 20)
-        await self.uma_support_card_limit_break_all()
-        return await self.uma_info()
 
     async def uma_gacha_strategy_two(self):
         # 10 pulls to support card gacha
         # FIXME: no idea how
-        await self.gacha_sc_ten_pulls(10)
-        await self.uma_support_card_limit_break_all()
-        return await self.uma_info()
+        await self.gacha_sc_pulls(10)
 
     async def uma_gacha_strategy_three(self):
         # first ten pull, later one pull
         await self.gacha_sc_pulls(10)
         await self.gacha_sc_pulls(1)
-        #self.uma_support_card_limit_break_all()
-        return await self.uma_info()
 
     async def uma_gacha_strategy_four(self):
         # single pull
         await self.gacha_sc_pulls(1)
-        #self.uma_support_card_limit_break_all()
-        return await self.uma_info()
 
-    def uma_gacha_strategy(self, mode):
+    def uma_gacha_strategy(self, mode, limit_break=False):
         if mode == 1:
-            return self.uma_gacha_strategy_one()
+            self.uma_gacha_strategy_one()
         elif mode == 2:
-            return self.uma_gacha_strategy_two()
+            self.uma_gacha_strategy_two()
         elif mode == 3:
-            return self.uma_gacha_strategy_three()
+            self.uma_gacha_strategy_three()
         else:
-            return self.uma_gacha_strategy_four()
+            self.uma_gacha_strategy_four()
+
+        if limit_break:
+            self.uma_support_card_limit_break_all()
+        return await self.uma_info()
 
     async def uma_account_trans(self, password):
         self.password = password
         data = self.device_info.copy()
         data["password"] = md5((password+"r!I@mt8e5i=").encode("utf8")).hexdigest()
         resp = await self.proto.post("/account/publish_transition_code", data)
-
