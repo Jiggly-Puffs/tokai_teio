@@ -529,7 +529,7 @@ class Derby(object):
             if r[1] > 10000:
                 route["fans"] = 0
             else:
-                route["fans"] = cur.execute("select need_fan_count from single_mode_program where id = %s" % r[1]).fetchall()[0][0]
+                route["fans"] = cur.execute("select need_fan_count from single_mode_program where id = %s" % r[1]).fetchone()[0]
             logger.warn(str(route))
             routes.append(route)
         con.close()
@@ -644,7 +644,7 @@ class Derby(object):
         data["current_turn"] = turn
         resp = await self.proto.post("/single_mode/race_entry", data)
 
-        await self.uma_check_event(resp["data"])
+        data = await self.single_mode_check_event(resp["data"])
 
         data = self.device_info.copy()
         data["is_short"] = 1
@@ -664,22 +664,49 @@ class Derby(object):
         data["current_turn"] = turn
         resp = await self.proto.post("/single_mode/race_out", data)
 
-        data = await self.uma_check_event()
+        data = await self.single_mode_check_event(resp["data"])
         return data
 
-    async def choose_race(self, info, need_run):
+    def choose_race(self, info, need_run, race_property):
         chara_info = info["chara_info"]
         races = info["race_condition_array"]
         chara_id = info["chara_info"]["card_id"] // 100
         con = sqlite3.connect("./data/master.mdb")
-        race_id = None
-        #for race in races:
+        choose_race_id = None
+        run_races = []
+        for race in races:
+            programs = cur.execute("select race_instance_id, need_fan_count from single_mode_program where race_instance_id = %s" % race["program_id"]).fetchone()[0]
+            if chara_info["fans"] < programs[1]:
+                continue
+            race_id = cur.execute("select race_id from race_instance where race_instance_id = %s" % programs[0]).fetchone()[0]
+            race_grade = cur.execute("select grade, course_set from race where id = %s" % race_id).fetchone()[0]
+            course_set = cur.execute("select distance, ground from race_course_set where id = %s" % race_grade[1]).fetchone()[0]
+
+            if course_set[1] == 1 and not race_property.get("turf", False): # turf
+                continue
+            if course_set[1] == 2 and not race_property.get("dirt", False): # dirt
+                continue
+            if course_set[0] >= 2400 and not race_property.get("long", False):
+                continue
+            if 1800 < course_set[0] <= 2400 and not race_property.get("middle", False):
+                continue
+            if 1400 < course_set[0] <= 1800 and not race_property.get("mile", False):
+                continue
+            if course_set[0] <= 1400 and not race_property.get("short", False):
+                continue
+            r = {}
+            r["grade"] = race_grade[0]
+            r["program_id"] = race["program_id"]
+            run_races.append(r)
+
+        if run_races:
+            choose_race_id = sorted(run_races, key=lambda k:k["grade"])[0]["program_id"]
 
         con.close()
-        if need_run and not race_id:
+        if need_run and not choose_race_id:
             # choose first race
-            race_id = races[0]["program_id"]
-        return race_id
+            choose_race_id = races[0]["program_id"]
+        return choose_race_id
 
     async def uma_gain_skill(self):
         pass
@@ -707,14 +734,28 @@ class Derby(object):
         data["friend_viewer_id"] = friend_viewer_id
         resp = await self.proto.post("/friend/search", data)
 
+    def detect_race_property(self, info):
+        # distance, ground
+        race_property = {}
+        chara_info = info["chara_info"]
+        if chara_info["proper_distance_long"] >= 7:
+            race_property["long"] = True
+        if chara_info["proper_distance_middle"] >= 7:
+            race_property["middle"] = True
+        if chara_info["proper_distance_mile"] >= 7:
+            race_property["mile"] = True
+        if chara_info["proper_distance_short"] >= 7:
+            race_property["short"] = True
+        if chara_info["proper_ground_dirt"] >= 6:
+            race_property["dirt"] = True
+        if chara_info["proper_ground_turf"] >= 6:
+            race_property["turf"] = True
+        return race_property
+
     async def uma_training(self, chara_id=None, sc_list=[], succ=[]):
-        while True:
-            try:
-                data = await self.single_mode_prepare(chara_id, sc_list, succ)
-                break
-            except Exception as e:
-                logger.warn(str(e))
+        data = await self.single_mode_prepare(chara_id, sc_list, succ)
         routes = self.single_mode_check_route(data)
+        race_property = self.detect_race_property(data)
         route_num = 0
         while True:
             data = await self.single_mode_check_event(data)
@@ -729,11 +770,12 @@ class Derby(object):
                 race_id = None
                 if fans < routes[route_num]["fans"]:
                     need_fans = routes[route_num]["fans"] - fans
-                    if (turn + ((need_fans+1000) // 1000)) <= routes[route_num]["turn"]:
+                    if ((need_fans+1000) // 1000) >= (routes[route_num]["turn"] - turn):
                         need_run = ((turn+1) == routes[route_num]["turn"])
-                        race_id = self.choose_race(data, need_run)
+                        race_id = self.choose_race(data, need_run, race_property)
                 if race_id:
-                    data = await self.run_race(race_id, turn)
+                    logger.warn("race_id %s" % race_id)
+                    data = await self.uma_run_race(race_id, turn)
                 else:
                     data = await self.single_mode_exec_cmd(data)
             # failed
