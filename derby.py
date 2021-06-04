@@ -82,12 +82,13 @@ class UmaProto(object):
 
     def update_session_id(self, resp):
         logger.debug("RESP: %s" % str(resp))
-        if resp["response_code"] != 1:
-            logger.error("ERROR RESPONSE_CODE %s: %s!!!" % (resp["response_code"], RESPCODE(resp["response_code"]).name))
         if resp.get("data_headers"):
             data_headers = resp["data_headers"]
             if data_headers.get("sid"):
                 self.session_id = md5(data_headers.get("sid").encode("utf8") + b'r!I@mt8e5i=').digest()
+        # update session_id first if we want to continue after error
+        if resp["response_code"] != 1:
+            logger.error("ERROR RESPONSE_CODE %s: %s!!!" % (resp["response_code"], RESPCODE(resp["response_code"]).name))
 
     async def post(self, url, data):
         url = UMA_URL + url
@@ -537,21 +538,22 @@ class Derby(object):
     async def uma_check_event(self, event, turn):
         data = self.device_info.copy()
         data["event_id"] = event["event_id"]
-        data["chara_id"] = event["chard_id"]
-        data["choice_number"] = 0 # always choose first option
+        data["chara_id"] = event["chara_id"]
+        # FIXME: always choose first option
+        data["choice_number"] = 0
         data["current_turn"] = turn
-        resp = await self.post("/single_mode/check_event", data)
+        resp = await self.proto.post("/single_mode/check_event", data)
         return resp["data"]
 
     async def uma_minigame(self, turn):
-        # FIXME: more result to gain rest & skills
+        # FIXME: add more result value to gain rest & skills
         data = self.device_info.copy()
         data["result"] = {}
         data["result"]["result_state"] = 2
         data["result"]["result_value"] = 2
         data["result"]["result_detail_array"] = [{"get_id": 0, "chara_id": 1002, "dress_id": 2, "motion": "Catch11", "face": "WaraiD"}]
         data["current_turn"] = turn
-        resp = await self.post("/single_mode/minigame_end", data)
+        resp = await self.proto.post("/single_mode/minigame_end", data)
         return resp["data"]
 
     async def single_mode_check_event(self, data):
@@ -566,6 +568,7 @@ class Derby(object):
     async def single_mode_exec_cmd(self, info):
         chara_info = info["chara_info"]
         cmds = sorted(info["home_info"]["command_info_array"], key=lambda k:k["command_id"], reverse=True)
+        turn = chara_info["turn"]
         mycmd = {}
         for cmd in cmds:
             if cmd["is_enable"] == 0:
@@ -591,38 +594,152 @@ class Derby(object):
                 mycmd["command_group_id"] = 304
                 break
 
+        if not mycmd:
+            cmds = sorted(cmds, key=lambda k:k["training_partner_array"], reverse=True)
             # FIXME: more AI mode to choose cmd wisely
-
+            speed = chara_info["speed"]
+            stamina = chara_info["stamina"]
+            power = chara_info["power"]
+            is_speed = is_stamina = is_power = False
+            min_val = min(speed, stamina, power)
+            if min_val == speed and (speed + turn * 6 < stamina + power):
+                is_speed = True
+            if min_val == stamina and (stamina + turn * 6 < speed + power):
+                is_stamina = True
+            if min_val == power and (power + turn * 6 < stamina + speed):
+                is_power = True
+            for cmd in cmds:
+                if cmd["is_enable"] == 0:
+                    continue
+                if (cmd["command_id"] // 100 != 1) or (cmd["command_id"] // 100 != 6):
+                    continue
+                if not is_speed and not is_stamina and not is_power:
+                    if cmd["training_partner_array"] < 4 and (cmd["command_id"] % 100 == 3):
+                        continue
+                    mycmd = cmd
+                    break
+                if is_speed and (cmd["command_id"] % 100 == 1):
+                    mycmd = cmd
+                    break
+                if is_stamina and (cmd["command_id"] % 100 == 5):
+                    mycmd = cmd
+                    break
+                if is_power and (cmd["command_id"] % 100 == 2):
+                    mycmd = cmd
+                    break
+        logger.warn(str(mycmd))
 
         data = self.device_info.copy()
-        # choose
         data["command_type"] = mycmd["command_type"]
         data["command_id"] = mycmd["command_id"]
-        if mycmd.get("command_group_id"):
-            data["command_group_id"] = mycmd["command_group_id"]
-        else:
-            data["command_group_id"] = 0
+        data["command_group_id"] = mycmd.get("command_group_id", 0)
         data["select_id"] = 0
-        data["current_turn"] = chara_info["turn"]
+        data["current_turn"] = turn
         data["current_vital"] = chara_info["vital"]
-        resp = await self.post("/single_mode/exec_command", data)
+        resp = await self.proto.post("/single_mode/exec_command", data)
         return resp["data"]
 
+    async def uma_run_race(self, program_id, turn):
+        data = self.device_info.copy()
+        data["program_id"] = program_id
+        data["current_turn"] = turn
+        resp = await self.proto.run("/single_mode/race_entry", data)
+
+        await self.uma_check_event(resp["data"])
+
+        data = self.device_info.copy()
+        data["is_short"] = 1
+        data["current_turn"] = turn
+        resp = await self.proto.run("/single_mode/race_start", data)
+
+        data = self.device_info.copy()
+        data["current_turn"] = turn
+        resp = await self.proto.run("/single_mode/race_end", data)
+
+        if resp["data"]["add_music"]:
+            # FIXME: obtain live
+            # /live/live_start
+            pass
+
+        data = self.device_info.copy()
+        data["current_turn"] = turn
+        resp = await self.proto.run("/single_mode/race_out", data)
+
+        data = await self.uma_check_event()
+        return data
+
+    async def choose_race(self, info, need_run):
+        chara_info = info["chara_info"]
+        races = info["race_condition_array"]
+        chara_id = info["chara_info"]["card_id"] // 100
+        con = sqlite3.connect("./data/master.mdb")
+        race_id = None
+        #for race in races:
+
+        con.close()
+        if need_run and not race_id:
+            # choose first race
+            race_id = races[0]["program_id"]
+        return race_id
+
+    async def uma_gain_skill(self):
+        pass
+
+    async def sing_mode_finish(self, info):
+        data = self.device_info.copy()
+        data["is_force_delete"] = False
+        data["current_turn"] = info["chara_info"]["turn"]
+        resp = await self.proto.run("/single_mode/finish", data)
+
+        friend_viewer_id = 0
+        for sc in resp["data"]["chara_info"]["support_card_array"]:
+            if sc["owner_viewer_id"] != 0:
+                friend_viewer_id = sc["owner_viewer_id"]
+                break
+
+        # change nick name
+        data = self.device_info.copy()
+        data["trained_chara_id"] = info["directory_card_array"]["trained_chara"]["trained_chara_id"]
+        data["nickname_id"] = info["nickname_id_array"][0]
+        resp = await self.proto.run("/trained_chara/change_nickname", data)
+
+        # friend search
+        data = self.device_info.copy()
+        data["friend_viewer_id"] = friend_viewer_id
+        resp = await self.proto.run("/friend/search", data)
+
     async def uma_training(self, chara_id=None, sc_list=[], succ=[]):
-        data = await self.single_mode_prepare(chara_id, sc_list, succ)
+        while True:
+            try:
+                data = await self.single_mode_prepare(chara_id, sc_list, succ)
+                break
+            except Exception as e:
+                logger.warn(str(e))
         routes = self.single_mode_check_route(data)
-        turn = 1
-        '''
+        route_num = 0
         while True:
             data = await self.single_mode_check_event(data)
-            if routes[0]["turn"] == turn:
+            turn = data["chara_info"]["turn"]
+            if routes[route_num]["turn"] == turn:
                 # obtain skill
-                # enter race
+                #await self.uma_gain_kill(data)
+                data = await self.uma_run_race(routes[route_num]["program_id"], turn)
+                route_num += 1
             else:
                 fans = data["chara_info"]["fans"]
-                if fans < xx and is_time:
-                    # go to race
-                data = await self.single_mode_exec_cmd(data)
-        '''
-
+                race_id = None
+                if fans < routes[route_num]["fans"]:
+                    need_fans = routes[route_num]["fans"] - fans
+                    if (turn + ((need_fans+1000) // 1000)) <= routes[route_num]["turn"]:
+                        need_run = ((turn+1) == routes[route_num]["turn"])
+                        race_id = self.choose_race(data, need_run)
+                if race_id:
+                    data = await self.run_race(race_id, turn)
+                else:
+                    data = await self.single_mode_exec_cmd(data)
+            # failed
+            if data["chara_info"]["state"] == 2:
+                break
+        # finish
+        await self.single_mode_finish(data)
 
