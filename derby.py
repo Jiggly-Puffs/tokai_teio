@@ -628,6 +628,19 @@ class Derby(object):
                     mycmd = cmd
                     break
 
+        if not mycmd: # maybe disable
+            cmds = sorted(cmds, key=lambda k:k["is_enable"], reverse=True)
+            for cmd in cmds:
+                if cmd["is_enable"] == 0:
+                    continue
+                if (cmd["command_id"] // 100 == 3) or (cmd["command_id"] // 100 == 4):
+                    continue
+                mycmd = cmd
+                break
+
+        if not mycmd:
+            logger.error("cannot find cmd: %s" % str(cmds))
+
         data = self.device_info.copy()
         data["command_type"] = mycmd["command_type"]
         data["command_id"] = mycmd["command_id"]
@@ -672,6 +685,7 @@ class Derby(object):
         races = info["race_condition_array"]
         chara_id = info["chara_info"]["card_id"] // 100
         con = sqlite3.connect("./data/master.mdb")
+        cur = con.cursor()
         choose_race_id = None
         run_races = []
         for race in races:
