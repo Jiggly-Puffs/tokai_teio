@@ -109,28 +109,35 @@ class Teio(object):
             info = await derby.uma_gacha_strategy(4)
             self.parse_gacha_info(info)
 
+    async def single_test(self):
+        derby = Derby()
+        await derby.uma_signup()
+        await derby.uma_daily()
+        await derby.uma_training()
+
 async def job():
     teio = Teio()
     #teio.training()
     #teio.gacha_login()
     #teio.gacha_signup(10)
     #teio.test()
-    for i in range(10):
-        await teio.batch_breeding(500)
+    #for i in range(10):
+        #await teio.batch_breeding(500)
     #teio.daily()
+    await teio.single_test()
 
-    
+
 async def main():
     jobs = []
-    for i in range(20):
+    for i in range(1):
         jobs.append(job())
     await asyncio.gather(*jobs)
-        
+
 
 if __name__ == "__main__":
     # test
     import coloredlogs
-    coloredlogs.install(logging.INFO)
+    coloredlogs.install(logging.DEBUG)
     logging.getLogger().addHandler(ShutdownHandler())
 
     import dotenv
