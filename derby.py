@@ -611,7 +611,7 @@ class Derby(object):
             for cmd in cmds:
                 if cmd["is_enable"] == 0:
                     continue
-                if (cmd["command_id"] // 100 != 1) or (cmd["command_id"] // 100 != 6):
+                if (cmd["command_id"] // 100 != 1) and (cmd["command_id"] // 100 != 6):
                     continue
                 if not is_speed and not is_stamina and not is_power:
                     if cmd["training_partner_array"] < 4 and (cmd["command_id"] % 100 == 3):
@@ -627,7 +627,6 @@ class Derby(object):
                 if is_power and (cmd["command_id"] % 100 == 2):
                     mycmd = cmd
                     break
-        logger.warn(str(mycmd))
 
         data = self.device_info.copy()
         data["command_type"] = mycmd["command_type"]
@@ -643,18 +642,18 @@ class Derby(object):
         data = self.device_info.copy()
         data["program_id"] = program_id
         data["current_turn"] = turn
-        resp = await self.proto.run("/single_mode/race_entry", data)
+        resp = await self.proto.post("/single_mode/race_entry", data)
 
         await self.uma_check_event(resp["data"])
 
         data = self.device_info.copy()
         data["is_short"] = 1
         data["current_turn"] = turn
-        resp = await self.proto.run("/single_mode/race_start", data)
+        resp = await self.proto.post("/single_mode/race_start", data)
 
         data = self.device_info.copy()
         data["current_turn"] = turn
-        resp = await self.proto.run("/single_mode/race_end", data)
+        resp = await self.proto.post("/single_mode/race_end", data)
 
         if resp["data"]["add_music"]:
             # FIXME: obtain live
@@ -663,7 +662,7 @@ class Derby(object):
 
         data = self.device_info.copy()
         data["current_turn"] = turn
-        resp = await self.proto.run("/single_mode/race_out", data)
+        resp = await self.proto.post("/single_mode/race_out", data)
 
         data = await self.uma_check_event()
         return data
@@ -689,7 +688,7 @@ class Derby(object):
         data = self.device_info.copy()
         data["is_force_delete"] = False
         data["current_turn"] = info["chara_info"]["turn"]
-        resp = await self.proto.run("/single_mode/finish", data)
+        resp = await self.proto.post("/single_mode/finish", data)
 
         friend_viewer_id = 0
         for sc in resp["data"]["chara_info"]["support_card_array"]:
@@ -701,12 +700,12 @@ class Derby(object):
         data = self.device_info.copy()
         data["trained_chara_id"] = info["directory_card_array"]["trained_chara"]["trained_chara_id"]
         data["nickname_id"] = info["nickname_id_array"][0]
-        resp = await self.proto.run("/trained_chara/change_nickname", data)
+        resp = await self.proto.post("/trained_chara/change_nickname", data)
 
         # friend search
         data = self.device_info.copy()
         data["friend_viewer_id"] = friend_viewer_id
-        resp = await self.proto.run("/friend/search", data)
+        resp = await self.proto.post("/friend/search", data)
 
     async def uma_training(self, chara_id=None, sc_list=[], succ=[]):
         while True:
