@@ -3,6 +3,7 @@
 import os
 import uuid
 import json
+import time
 import httpx
 import base64
 import random
@@ -91,6 +92,7 @@ class UmaProto(object):
             logger.error("ERROR RESPONSE_CODE %s: %s!!!" % (resp["response_code"], RESPCODE(resp["response_code"]).name))
 
     async def post(self, url, data):
+        time.sleep(0.1) # avoid double click
         url = UMA_URL + url
         logger.info("URL: %s" % url)
         headers = self.con_headers()
@@ -437,14 +439,18 @@ class Derby(object):
         con = sqlite3.connect("./data/master.mdb")
         cur = con.cursor()
         sc_card_ids = []
+        sc_chara_ids = []
         for sc in sc_list:
             cid = cur.execute("select chara_id from support_card_data where id= %s" % sc["support_card_id"]).fetchone()[0]
             if cid == (chara_id // 100):
                 continue
+            if cid in sc_chara_ids:
+                continue
             sc_card_ids.append(sc["support_card_id"])
+            sc_chara_ids.append(cid)
             if len(sc_card_ids) == 5:
                 con.close()
-                return sc_card_ids
+                return sc_card_ids, sc_chara_ids
 
     def choose_succs(self, info, chara_id):
         trained = sorted(info["trained_chara"], key=lambda k: k["rank_score"], reverse=True)
@@ -457,7 +463,7 @@ class Derby(object):
                 return succs
         return succs
 
-    async def uma_choose_rental(self, chara_id):
+    async def uma_choose_rental(self, chara_id, sc_chara_ids):
         data = self.device_info.copy()
         resp = await self.proto.post("/single_mode/rental_info", data)
         FRIEND_CARDS = [30016, 30028, 30021]
@@ -469,12 +475,16 @@ class Derby(object):
             cid = cur.execute("select chara_id from support_card_data where id= %s" % sc["support_card_id"]).fetchone()[0]
             if cid == (chara_id // 100):
                 continue
+            if cid in sc_chara_ids:
+                continue
             if sc["support_card_id"] in FRIEND_CARDS and sc["limit_break_count"] > 2:
                 con.close()
                 return {"viewer_id": sc["viewer_id"], "support_card_id": sc["support_card_id"]}
         for sc in sc_cards:
             cid = cur.execute("select chara_id from support_card_data where id= %s" % sc["support_card_id"]).fetchone()[0]
             if cid == (chara_id // 100):
+                continue
+            if cid in sc_chara_ids:
                 continue
             con.close()
             return {"viewer_id": sc["viewer_id"], "support_card_id": sc["support_card_id"]}
@@ -484,7 +494,7 @@ class Derby(object):
         if not chara_id:
             chara_id = self.choose_training_uma(info)
         if not sc_list:
-            support_card_ids = self.choose_sc_cards(info, chara_id)
+            support_card_ids, sc_chara_ids = self.choose_sc_cards(info, chara_id)
         if not succ:
             succ = self.choose_succs(info, chara_id)
 
@@ -496,7 +506,7 @@ class Derby(object):
             if item["item_id"] == 59:
                 money = item["number"]
                 break
-        friend_info = await self.uma_choose_rental(chara_id)
+        friend_info = await self.uma_choose_rental(chara_id, sc_chara_ids)
 
         start_chara = {}
         start_chara["card_id"] = chara_id
@@ -513,8 +523,6 @@ class Derby(object):
         data = self.device_info.copy()
         data["start_chara"] = start_chara
         data["tp_info"] = info["tp_info"]
-        if data["tp_info"]["current_tp"] == 100 and data["tp_info"]["max_recovery_time"] == 0:
-            data["tp_info"]["max_recovery_time"] = 1622790739
         data["current_money"] = money
         resp = await self.proto.post("/single_mode/start", data)
 
@@ -746,13 +754,62 @@ class Derby(object):
             choose_race_id = races[0]["program_id"]
         return choose_race_id
 
-    async def uma_gain_skill(self, info):
+    async def uma_gain_skill(self, info, turn):
         skill_point = info["chara_info"]["skill_point"]
+        skill_tips = info["chara_info"]["skill_tips_array"]
+        if not skill_tips:
+            return
+        got_skills = []
+        for sk in info["chara_info"]["skill_array"]:
+            got_skills.append(sk["skill_id"])
+        con = sqlite3.connect("./data/master.mdb")
+        cur = con.cursor()
+        gain_skills = []
+        # FIXME: random choose skill
+        count = 0
+        while True:
+            skill_tip = skill_tips[random.randint(0, len(skill_tips)-1)]
+            sk_info = cur.execute("select id, rarity from skill_data where group_id = %d" % skill_tip["group_id"]).fetchall()
+            sk_info.reverse()
+            logger.warn(str(skill_tip))
+            logger.warn(str(sk_info))
+            logger.warn(str(got_skills))
+            if not sk_info or len(sk_info) > 2:
+                count += 1
+                if count > (len(skill_tips) // 3):
+                    break
+                continue
+            for sk in sk_info:
+                if sk[1] > skill_tip["rarity"]:
+                    continue
+                if sk[0] in got_skills:
+                    continue
+                point = cur.execute("select need_skill_point from single_mode_skill_need_point where id = %d" % sk[0]).fetchone()[0]
+                if point and point <= skill_point:
+                    skill = {}
+                    skill["skill_id"] = sk[0]
+                    skill["level"] = skill_tip["level"]
+                    gain_skills.append(skill)
+                    skill_point -= point
+                    if skill_point < 50:
+                        break
+            count += 1
+            if count > (len(skill_tips) // 3):
+                break
+        con.close()
+        if gain_skills:
+            data = self.device_info.copy()
+            data["gain_skill_info_array"] = gain_skills
+            data["current_turn"] = turn
+            await self.proto.post("/single_mode/gain_skills", data)
 
     async def single_mode_finish(self, info):
+        turn = info["chara_info"]["turn"]
+        await self.uma_gain_skill(info, turn)
+
         data = self.device_info.copy()
         data["is_force_delete"] = False
-        data["current_turn"] = info["chara_info"]["turn"]
+        data["current_turn"] = turn
         resp = await self.proto.post("/single_mode/finish", data)
         info = resp["data"]
 
@@ -764,14 +821,16 @@ class Derby(object):
 
         # change nick name
         data = self.device_info.copy()
-        data["trained_chara_id"] = info["directory_card_array"]["trained_chara"]["trained_chara_id"]
-        data["nickname_id"] = info["nickname_id_array"][0]
+        data["trained_chara_id"] = info["directory_card_array"][0]["trained_chara"]["trained_chara_id"]
+        data["nickname_id"] = info["chara_info"]["nickname_id_array"][0]
         resp = await self.proto.post("/trained_chara/change_nickname", data)
 
-        # friend search
+        '''
+        # FIXME: ignore friend search now
         data = self.device_info.copy()
         data["friend_viewer_id"] = friend_viewer_id
         resp = await self.proto.post("/friend/search", data)
+        '''
 
     def detect_race_property(self, info):
         # distance, ground
@@ -803,7 +862,8 @@ class Derby(object):
                 # obtain skill
                 if routes[route_num]["program_id"]:
                     # race target, not fan target
-                    await self.uma_gain_skill(data)
+                    if turn > 20:
+                        await self.uma_gain_skill(data, turn)
                     data = await self.uma_run_race(routes[route_num]["program_id"], turn)
                 route_num += 1
             else:
@@ -824,4 +884,7 @@ class Derby(object):
                 break
         # finish
         await self.single_mode_finish(data)
+        await self.uma_receive_gifts()
+        info = await self.uma_info()
+        logger.warn("fcoin %d" % info["fcoin"])
 
