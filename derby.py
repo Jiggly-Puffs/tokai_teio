@@ -365,18 +365,19 @@ class Derby(object):
         resp = await self.proto.post("/gacha/exec", data)
 
     @staticmethod
-    async def gacha_find_sc_pool(gachas):
+    def gacha_find_sc_pool(gachas):
         for gacha in gachas:
             if ((gacha["id"] // 10000) == 3) and ((gacha["id"] % 2) == 1):
                 return gacha["id"]
         return None
 
-    async def gacha_sc_pulls(self, pulls, well=1):
+    async def gacha_sc_pulls(self, pulls, well=1, times=None):
         coins = (pulls * 150) * well
         fcoin = (await self.uma_info())["fcoin"]
-        times = fcoin // coins
+        if not times:
+            times = fcoin // coins
         logger.info("To Gacha %d (one: %d)" % (times, coins))
-        gachas = self.uma_gacha_info()
+        gachas = await self.uma_gacha_info()
         gacha_id = self.gacha_find_sc_pool(gachas)
         if gacha_id:
             for i in range(times):
@@ -884,7 +885,4 @@ class Derby(object):
                 break
         # finish
         await self.single_mode_finish(data)
-        await self.uma_receive_gifts()
-        info = await self.uma_info()
-        logger.warn("fcoin %d" % info["fcoin"])
 
