@@ -114,10 +114,10 @@ class Teio(object):
         await derby.uma_signup()
         await derby.uma_daily()
         '''
-        await derby.gacha_sc_pulls(10, 1, 3)
+        await derby.uma_gacha_pulls(10, 1, 3, 1)
         await derby.uma_support_card_limit_break_all()
         info = await derby.uma_info()
-        logger.warn("fcoin %d" % info["fcoin"])
+        logger.warning("fcoin %d" % info["fcoin"])
         self.parse_gacha_info(info)
         await derby.uma_training()
         await derby.uma_receive_gifts()
@@ -125,7 +125,7 @@ class Teio(object):
         '''
         await derby.uma_read_story()
         info = await derby.uma_info()
-        logger.warn("fcoin %d" % info["fcoin"])
+        logger.warning("fcoin %d" % info["fcoin"])
 
 async def job():
     teio = Teio()

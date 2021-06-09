@@ -178,9 +178,3 @@ class RESPCODE(enum.Enum):
 	STORY_EVENT_NOT_IN_TERM = 9001
 	USER_NOT_FOUND_ON_LOGIN = 99999
 
-
-class Uma_Training_Mode(enum.Enum):
-    SPEED_MODE = 0
-    STAMINA_MODE = 1
-    POWER_MODE = 2
-

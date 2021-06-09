@@ -99,20 +99,22 @@ class UmaProto(object):
         logger.debug("Headers: %s" % str(headers))
         logger.debug("Req: %s" % data)
         req = self.con_req(data)
-        while True:
+        for i in range(5):
             try:
                 async with httpx.AsyncClient() as client:
                     r = await client.post(url, content=req, headers=headers)
                 break
             except Exception as e:
                 logger.warning(str(e))
+                if i == 4:
+                    logger.error("HTTP Max Tried Timeout")
                 await asyncio.sleep(1)
         if r.status_code != 200:
             logger.error("url: %s\n Error code: %d" % (url, r.status_code))
         try:
             resp = msgpack.unpackb(self.decompress(r.text), raw=False)
         except msgpack.ExtraData as e:
-            logger.warn("msgpack ExtraData")
+            logger.warning("msgpack ExtraData")
             resp = e.args[0] # ExtraData(ret, unpacker._get_extradata())
         self.update_session_id(resp)
         return resp
@@ -217,7 +219,7 @@ class Derby(object):
                 global RES_VER
                 if data["resource_version"] != RES_VER:
                     RES_VER = data["resource_version"]
-                    logger.warning("NEW RES-VER: %s" % RES_VER)
+                    logger.warninging("NEW RES-VER: %s" % RES_VER)
 
     def parse_gacha(self, resp):
         return resp["data"]["gacha_info_list"]
@@ -364,20 +366,21 @@ class Derby(object):
         resp = await self.proto.post("/gacha/exec", data)
 
     @staticmethod
-    def gacha_find_sc_pool(gachas):
+    def gacha_find_pool(gachas, category=1):
         for gacha in gachas:
-            if ((gacha["id"] // 10000) == 3) and ((gacha["id"] % 2) == 1):
+            # category: 0: uma pool / 1: support card pool
+            if ((gacha["id"] // 10000) == 3) and ((gacha["id"] % 2) == category):
                 return gacha["id"]
         return None
 
-    async def gacha_sc_pulls(self, pulls, well=1, times=None):
+    async def uma_gacha_pulls(self, pulls, well=1, times=None, category=1):
         coins = (pulls * 150) * well
         fcoin = (await self.uma_info())["fcoin"]
         if not times:
             times = fcoin // coins
         logger.info("To Gacha %d (one: %d)" % (times, coins))
         gachas = await self.uma_gacha_info()
-        gacha_id = self.gacha_find_sc_pool(gachas)
+        gacha_id = self.gacha_find_sc_pool(gachas, category)
         if gacha_id:
             for i in range(times):
                 for j in range(well):
@@ -385,20 +388,31 @@ class Derby(object):
                     fcoin -= (pulls * 150)
                     await asyncio.sleep(3) # otherwise will trigger 208 fault ( DOUBLE_CLICK_ERROR )
 
-    async def uma_gacha_strategy(self, mode, limit_break=False):
+    async def uma_gacha_strategy(self, mode=-1, pulls=None, limit_break=False):
         if mode == 1:
             # one well to support card gacha
-            await self.gacha_sc_pulls(10, 20)
+            await self.uma_gacha_pulls(10, 20)
         elif mode == 2:
             # 10 pulls to support card gacha
-            await self.gacha_sc_pulls(10)
+            await self.uma_gacha_pulls(10)
         elif mode == 3:
             # first ten pull, later one pull
-            await self.gacha_sc_pulls(10)
-            await self.gacha_sc_pulls(1)
-        else:
+            await self.uma_gacha_pulls(10)
+            await self.uma_gacha_pulls(1)
+        elif mode == 4:
             # single pull
-            await self.gacha_sc_pulls(1)
+            await self.uma_gacha_pulls(1)
+        elif mode == 5:
+            # uma pool
+            if pulls:
+                await self.uma_gacha_pulls(pulls[0], pulls[1], pulls[2], 0)
+            else:
+                logger.warning("Uma pool needs pulls argument")
+        else:
+            if pulls:
+                await self.uma_gacha_pulls(pulls[0], pulls[1], pulls[2], pulls[3])
+            else:
+                logger.warning("No such gacha mode")
 
         if limit_break:
             await self.uma_support_card_limit_break_all()
@@ -486,8 +500,8 @@ class Derby(object):
         if not succ:
             succ = self.choose_succs(info, chara_id)
 
-        logger.warn("card_id %d" % chara_id)
-        logger.warn("sc: %s" % str(support_card_ids))
+        logger.warning("card_id %d" % chara_id)
+        logger.warning("sc: %s" % str(support_card_ids))
 
         money = 0
         for item in info["item_list"]:
@@ -550,7 +564,7 @@ class Derby(object):
                 route["fans"] = 0
             else:
                 route["fans"] = cur.execute("select need_fan_count from single_mode_program where id = %d" % r[1]).fetchone()[0]
-            logger.warn(str(route))
+            logger.warning(str(route))
             routes.append(route)
         con.close()
         return sorted(routes, key=lambda k:k["turn"])
@@ -759,9 +773,9 @@ class Derby(object):
             skill_tip = skill_tips[random.randint(0, len(skill_tips)-1)]
             sk_info = cur.execute("select id, rarity from skill_data where group_id = %d" % skill_tip["group_id"]).fetchall()
             sk_info.reverse()
-            logger.warn(str(skill_tip))
-            logger.warn(str(sk_info))
-            logger.warn(str(got_skills))
+            logger.warning(str(skill_tip))
+            logger.warning(str(sk_info))
+            logger.warning(str(got_skills))
             if not sk_info or len(sk_info) > 2:
                 count += 1
                 if count > (len(skill_tips) // 3):
@@ -863,7 +877,7 @@ class Derby(object):
                         need_run = ((turn+1) == routes[route_num]["turn"])
                         race_id = self.choose_race(data, need_run, race_property)
                 if race_id:
-                    logger.warn("race_id %s" % race_id)
+                    logger.warning("race_id %s" % race_id)
                     data = await self.uma_run_race(race_id, turn)
                 else:
                     data = await self.single_mode_exec_cmd(data)
