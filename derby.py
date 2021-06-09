@@ -23,9 +23,9 @@ logger = logging.getLogger(__name__)
 
 
 UMA_URL = "https://api-umamusume.cygames.jp/umamusume"
-APP_VER = "1.4.0"
+APP_VER = "1.5.0"
 RES_VER = "10001520:TdKTHfQLd73S"
-UMA_PUBKEY = "6b20e2ab6c311330f761d737ce3f3025750850665eea58b6372f8d2f57501eb348ee86c2de2699100d32f9e07dbfccb9a8fe658b"
+UMA_PUBKEY = "6b20e2ab6c311330f761d737ce3f3025750850665eea58b6372f8d2f57501eb3e6355f6fd9f01d9a3aba9d89cabd628635279b8a"
 
 USER_AGENT = "Mozilla/5.0 (Linux; Android 10; SM-A102U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.72 Mobile Safari/537.36"
 
@@ -385,32 +385,20 @@ class Derby(object):
                     fcoin -= (pulls * 150)
                     await asyncio.sleep(3) # otherwise will trigger 208 fault ( DOUBLE_CLICK_ERROR )
 
-    async def uma_gacha_strategy_one(self):
-        # one well to support card gacha
-        await self.gacha_sc_pulls(10, 20)
-
-    async def uma_gacha_strategy_two(self):
-        # 10 pulls to support card gacha
-        await self.gacha_sc_pulls(10)
-
-    async def uma_gacha_strategy_three(self):
-        # first ten pull, later one pull
-        await self.gacha_sc_pulls(10)
-        await self.gacha_sc_pulls(1)
-
-    async def uma_gacha_strategy_four(self):
-        # single pull
-        await self.gacha_sc_pulls(1)
-
     async def uma_gacha_strategy(self, mode, limit_break=False):
         if mode == 1:
-            self.uma_gacha_strategy_one()
+            # one well to support card gacha
+            await self.gacha_sc_pulls(10, 20)
         elif mode == 2:
-            self.uma_gacha_strategy_two()
+            # 10 pulls to support card gacha
+            await self.gacha_sc_pulls(10)
         elif mode == 3:
-            self.uma_gacha_strategy_three()
+            # first ten pull, later one pull
+            await self.gacha_sc_pulls(10)
+            await self.gacha_sc_pulls(1)
         else:
-            self.uma_gacha_strategy_four()
+            # single pull
+            await self.gacha_sc_pulls(1)
 
         if limit_break:
             await self.uma_support_card_limit_break_all()
@@ -441,7 +429,7 @@ class Derby(object):
         sc_card_ids = []
         sc_chara_ids = []
         for sc in sc_list:
-            cid = cur.execute("select chara_id from support_card_data where id= %s" % sc["support_card_id"]).fetchone()[0]
+            cid = cur.execute("select chara_id from support_card_data where id= %d" % sc["support_card_id"]).fetchone()[0]
             if cid == (chara_id // 100):
                 continue
             if cid in sc_chara_ids:
@@ -472,7 +460,7 @@ class Derby(object):
         con = sqlite3.connect("./data/master.mdb")
         cur = con.cursor()
         for sc in sc_cards:
-            cid = cur.execute("select chara_id from support_card_data where id= %s" % sc["support_card_id"]).fetchone()[0]
+            cid = cur.execute("select chara_id from support_card_data where id= %d" % sc["support_card_id"]).fetchone()[0]
             if cid == (chara_id // 100):
                 continue
             if cid in sc_chara_ids:
@@ -481,7 +469,7 @@ class Derby(object):
                 con.close()
                 return {"viewer_id": sc["viewer_id"], "support_card_id": sc["support_card_id"]}
         for sc in sc_cards:
-            cid = cur.execute("select chara_id from support_card_data where id= %s" % sc["support_card_id"]).fetchone()[0]
+            cid = cur.execute("select chara_id from support_card_data where id= %d" % sc["support_card_id"]).fetchone()[0]
             if cid == (chara_id // 100):
                 continue
             if cid in sc_chara_ids:
@@ -551,7 +539,7 @@ class Derby(object):
         chara_id = info["chara_info"]["card_id"] // 100
         con = sqlite3.connect("./data/master.mdb")
         cur = con.cursor()
-        races = cur.execute("select turn, condition_id from single_mode_route_race where race_set_id= %s" % chara_id).fetchall()
+        races = cur.execute("select turn, condition_id from single_mode_route_race where race_set_id= %d" % chara_id).fetchall()
         routes = []
         for r in races:
             print(r)
@@ -561,7 +549,7 @@ class Derby(object):
             if r[1] > 10000:
                 route["fans"] = 0
             else:
-                route["fans"] = cur.execute("select need_fan_count from single_mode_program where id = %s" % r[1]).fetchone()[0]
+                route["fans"] = cur.execute("select need_fan_count from single_mode_program where id = %d" % r[1]).fetchone()[0]
             logger.warn(str(route))
             routes.append(route)
         con.close()
@@ -721,12 +709,12 @@ class Derby(object):
         choose_race_id = None
         run_races = []
         for race in races:
-            programs = cur.execute("select race_instance_id, need_fan_count from single_mode_program where id = %s" % race["program_id"]).fetchone()
+            programs = cur.execute("select race_instance_id, need_fan_count from single_mode_program where id = %d" % race["program_id"]).fetchone()
             if chara_info["fans"] < programs[1]:
                 continue
-            race_id = cur.execute("select race_id from race_instance where id = %s" % programs[0]).fetchone()[0]
-            race_grade = cur.execute("select grade, course_set from race where id = %s" % race_id).fetchone()
-            course_set = cur.execute("select distance, ground from race_course_set where id = %s" % race_grade[1]).fetchone()
+            race_id = cur.execute("select race_id from race_instance where id = %d" % programs[0]).fetchone()[0]
+            race_grade = cur.execute("select grade, course_set from race where id = %d" % race_id).fetchone()
+            course_set = cur.execute("select distance, ground from race_course_set where id = %d" % race_grade[1]).fetchone()
 
             if course_set[1] == 1 and not race_property.get("turf", False): # turf
                 continue
@@ -887,10 +875,10 @@ class Derby(object):
 
     ### Team Stadium #########################################################################
 
-    def gen_team_array(self, trained_chara, choosed, distance):
+    def gen_team_array(self, trained_chara, choosed_chara, distance):
         tr = None
         for t in trained_chara:
-            if t["trained_chara_id"] in choosed:
+            if t["card_id"] in choosed_chara:
                 continue
             tr = t
             break
@@ -913,37 +901,37 @@ class Derby(object):
         info = await self.uma_raw_info()
         score = 0
         teams = []
-        choosed = []
+        choosed_chara = []
         # dirt first
         trained_chara = sorted(info["trained_chara"], key=lambda k:(k["proper_ground_dirt"] // 6) * 10000 + k["rank_score"], reverse=True)
-        tr, arr = self.gen_team_array(trained_chara, choosed, 5)
+        tr, arr = self.gen_team_array(trained_chara, choosed_chara, 5)
         score += tr["rank_score"]
         teams.extend(arr)
-        choosed.append(tr["trained_chara_id"])
+        choosed_chara.append(tr["card_id"])
 
         trained_chara = sorted(trained_chara, key=lambda k:(k["proper_distance_short"] // 6) * 10000 + k["rank_score"], reverse=True)
-        tr, arr = self.gen_team_array(trained_chara, choosed, 1)
+        tr, arr = self.gen_team_array(trained_chara, choosed_chara, 1)
         score += tr["rank_score"]
         teams.extend(arr)
-        choosed.append(tr["trained_chara_id"])
+        choosed_chara.append(tr["card_id"])
 
         trained_chara = sorted(trained_chara, key=lambda k:(k["proper_distance_mile"] // 6) * 10000 + k["rank_score"], reverse=True)
-        tr, arr = self.gen_team_array(trained_chara, choosed, 2)
+        tr, arr = self.gen_team_array(trained_chara, choosed_chara, 2)
         score += tr["rank_score"]
         teams.extend(arr)
-        choosed.append(tr["trained_chara_id"])
+        choosed_chara.append(tr["card_id"])
 
         trained_chara = sorted(trained_chara, key=lambda k:(k["proper_distance_middle"] // 6) * 10000 + k["rank_score"], reverse=True)
-        tr, arr = self.gen_team_array(trained_chara, choosed, 3)
+        tr, arr = self.gen_team_array(trained_chara, choosed_chara, 3)
         score += tr["rank_score"]
         teams.extend(arr)
-        choosed.append(tr["trained_chara_id"])
+        choosed_chara.append(tr["card_id"])
 
         trained_chara = sorted(trained_chara, key=lambda k:(k["proper_distance_long"] // 6) * 10000 + k["rank_score"], reverse=True)
-        tr, arr = self.gen_team_array(trained_chara, choosed, 4)
+        tr, arr = self.gen_team_array(trained_chara, choosed_chara, 4)
         score += tr["rank_score"]
         teams.extend(arr)
-        choosed.append(tr["trained_chara_id"])
+        choosed_chara.append(tr["card_id"])
 
         data = self.device_info.copy()
         data["team_data_array"] = teams
@@ -980,8 +968,31 @@ class Derby(object):
 
     ### Story ################################################################################
 
-    async def uma_chara_story(self, episode_id):
+    async def uma_read_chara_story(self, episode_id):
         data = self.device_info.copy()
         data["episode_id"] = episode_id
-        resp = await self.proto.post("/character_story/first_clear", data)
+        await self.proto.post("/character_story/first_clear", data)
 
+    async def uma_read_story(self):
+        data = self.device_info.copy()
+        data["add_home_story_data_array"] = []
+        data["add_short_episode_data_array"] = []
+        data["add_home_poster_data_array"] = []
+        data["add_tutorial_guide_data_array"] = []
+        data["add_released_episode_data_array"] = []
+        resp = await self.proto.post("/read_info/index", data)
+        read_stories = sorted(resp["data"]["released_episode_data_array"], key=lambda k:k["id"], reverse=True)
+
+        info = await self.uma_raw_info()
+        charas = info["chara_list"]
+        con = sqlite3.connect("./data/master.mdb")
+        cur = con.cursor()
+        for chara in charas:
+            stories = cur.execute("select id, story_id from chara_story_data where chara_id = %d and episode_index < 5" % chara["chara_id"]).fetchall()
+            for story in stories:
+                if story[1] in read_stories:
+                    continue
+                await self.uma_read_chara_story(story[0])
+                time.sleep(1)
+
+        con.close()

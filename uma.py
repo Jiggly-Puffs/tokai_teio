@@ -113,7 +113,6 @@ class Teio(object):
         derby = Derby()
         await derby.uma_signup()
         await derby.uma_daily()
-        await derby.uma_team_stadium(edit=True)
         '''
         await derby.gacha_sc_pulls(10, 1, 3)
         await derby.uma_support_card_limit_break_all()
@@ -122,9 +121,11 @@ class Teio(object):
         self.parse_gacha_info(info)
         await derby.uma_training()
         await derby.uma_receive_gifts()
+        wait derby.uma_team_stadium(edit=True)
+        '''
+        await derby.uma_read_story()
         info = await derby.uma_info()
         logger.warn("fcoin %d" % info["fcoin"])
-        '''
 
 async def job():
     teio = Teio()
