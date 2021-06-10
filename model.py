@@ -3,6 +3,16 @@ from tortoise import fields
 import datetime
 import enum
 
+__all__ = (
+    "Gender",
+    "AuthType",
+    "Account",
+    "CardPrototype",
+    "Card",
+    "SupportCardPrototype",
+    "SupportCard",
+)
+
 
 class Gender(enum.Enum):
     MALE = "MALE"
@@ -63,8 +73,10 @@ class Card(Model):
 
     id: int = fields.BigIntField(pk=True, null=False)
 
-    account: fields.ForeignKeyNullableRelation[Account] = fields.ForeignKeyField("model.Account", source_field='account_id', related_name="cards") # type: ignore
-    prototype: fields.ForeignKeyNullableRelation[CardPrototype] = fields.ForeignKeyField("model.CardPrototype", source_field='prototype_id', related_name="cards") # type: ignore
+    account: fields.ForeignKeyNullableRelation[Account] = \
+            fields.ForeignKeyField("model.Account", source_field='account_id', related_name="cards") # type: ignore
+    prototype: fields.ForeignKeyNullableRelation[CardPrototype] = \
+            fields.ForeignKeyField("model.CardPrototype", source_field='prototype_id', related_name="cards") # type: ignore
 
     rarity = fields.BigIntField()
     talent_level = fields.BigIntField()
@@ -84,8 +96,10 @@ class SupportCard(Model):
         db_table = 'support_card'
     id: int = fields.BigIntField(pk=True, null=False)
 
-    account: fields.ForeignKeyNullableRelation[Account] = fields.ForeignKeyField("model.Account", source_field='account_id', related_name="support_cards") # type: ignore
-    prototype: fields.ForeignKeyNullableRelation[SupportCardPrototype] = fields.ForeignKeyField("model.SupportCardPrototype", source_field='prototype_id', related_name="support_cards") # type: ignore
+    account: fields.ForeignKeyNullableRelation[Account] = \
+            fields.ForeignKeyField("model.Account", source_field='account_id', related_name="support_cards") # type: ignore
+    prototype: fields.ForeignKeyNullableRelation[SupportCardPrototype] = \
+            fields.ForeignKeyField("model.SupportCardPrototype", source_field='prototype_id', related_name="support_cards") # type: ignore
 
     favorite_flag = fields.BigIntField(null=False)
     limit_break_count = fields.BigIntField(null=False)
