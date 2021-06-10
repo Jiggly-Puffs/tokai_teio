@@ -2,6 +2,5 @@
 __pycache__
 bak
 tmp
-test.py
 data/derby.json
 .env
