@@ -20,12 +20,12 @@ class ShutdownHandler(logging.StreamHandler):
 
 async def test_signup(num, name=None, sex=None):
     for i in range(num):
-            logger.info("Breeding uma %d" % (i+1))
-            client = UmaClient()
-            await client.signup(name, sex)
-            await derby.Gifts(client).run()
-            info = await client.get_info()
-            await asyncio.sleep(3)
+        logger.info("Breeding uma %d" % (i+1))
+        client = UmaClient()
+        await client.signup(name, sex)
+        await derby.Gifts(client).run()
+        info = await client.get_info()
+        await asyncio.sleep(3)
 
 
 async def test_single_mode():
