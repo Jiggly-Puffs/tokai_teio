@@ -42,7 +42,7 @@ async def main():
     await db.init()
 
     async with aiofiles.open(options.input, "r") as f:
-        ids = map(lambda x: x.viewer_id, await model.Account.all())
+        ids = await model.Account.all().values_list("viewer_id", flat=True)
         ids = set(ids)
         
         jobs = []
