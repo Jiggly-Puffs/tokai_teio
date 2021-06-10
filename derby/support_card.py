@@ -2,6 +2,7 @@
 
 from .derby import Derby
 import logging
+import asyncio
 logger = logging.getLogger(__name__)
 
 
@@ -32,8 +33,8 @@ class SupportCard(Derby):
                     logger.warning("support card %d: %d" % (sc["support_card_id"], sc["stock"]+sc["limit_break_count"]+1))
                     break
                 await self.uma_support_card_limit_break(sc["support_card_id"])
-                await asyncio.sleep(1) # otherwise will trigger 208 fault ( DOUBLE_CLICK_ERROR )
+                await asyncio.sleep(0.5) # otherwise will trigger 208 fault ( DOUBLE_CLICK_ERROR )
 
     async def run(self):
-    	self.uma_support_card_limit_break_all()
+    	await self.uma_support_card_limit_break_all()
     	# maybe do level up later

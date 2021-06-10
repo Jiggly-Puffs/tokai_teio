@@ -23,18 +23,31 @@ async def test_signup(num, name=None, sex=None):
             logger.info("Breeding uma %d" % (i+1))
             client = UmaClient()
             await client.signup(name, sex)
-            await client.run(derby.Gifts)
+            await derby.Gifts(client).run()
             info = await client.get_info()
             await asyncio.sleep(3)
 
 
-async def test_single_mode(self, data):
+async def test_single_mode():
+    data = json.loads(open("./data/derby.json", "r").readlines()[-1])
     client = UmaClient(data)
     await client.signin()
-    await client.run(derby.Training)
+    await derby.Gacha(client).run(5, [10, 1, 2, 1])
+    await derby.SupportCard(client).run()
+    await derby.Training(client).run()
+    info = await client.get_info()
+
+
+async def test_team_race():
+    data = json.loads(open("./data/derby.json", "r").readlines()[-1])
+    client = UmaClient(data)
+    await client.signin()
+    await derby.TeamRace(client).run()
+    info = await client.get_info()
+
 
 async def job():
-    await test_signup(1)
+    await test_single_mode()
 
 
 async def main():

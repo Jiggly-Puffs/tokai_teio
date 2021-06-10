@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from .derby import Derby
+import random
 import sqlite3
 import logging
 logger = logging.getLogger(__name__)
@@ -78,69 +79,75 @@ class Training(Derby):
 
     async def single_mode_prepare(self, chara_id, sc_list, succ):
         info = await self.get_account_info()
-        if not chara_id:
-            chara_id = self.choose_training_uma(info)
-        if not sc_list:
-            support_card_ids, sc_chara_ids = self.choose_sc_cards(info, chara_id)
-        if not succ:
-            succ = self.choose_succs(info, chara_id)
+        if info["single_mode_chara_light"]:
+            # load single mode
+            resp = await self.client.post("/single_mode/load")
+        else:
+            # new single mode
+            if not chara_id:
+                chara_id = self.choose_training_uma(info)
+            if not sc_list:
+                support_card_ids, sc_chara_ids = self.choose_sc_cards(info, chara_id)
+            if not succ:
+                succ = self.choose_succs(info, chara_id)
 
-        logger.debug("card_id %d" % chara_id)
-        logger.debug("sc: %s" % str(support_card_ids))
+            logger.debug("card_id %d" % chara_id)
+            logger.debug("sc: %s" % str(support_card_ids))
 
-        money = 0
-        for item in info["item_list"]:
-            if item["item_id"] == 59:
-                money = item["number"]
-                break
-        friend_info = await self.choose_rental(chara_id, sc_chara_ids)
+            money = 0
+            for item in info["item_list"]:
+                if item["item_id"] == 59:
+                    money = item["number"]
+                    break
+            friend_info = await self.choose_rental(chara_id, sc_chara_ids)
 
-        start_chara = {}
-        start_chara["card_id"] = chara_id
-        start_chara["support_card_ids"] = support_card_ids
-        start_chara["friend_support_card_info"] = friend_info
-        start_chara["succession_trained_chara_id_1"] = succ[0]
-        start_chara["succession_trained_chara_id_2"] = succ[1]
-        start_chara["rental_succession_trained_chara"] = {"viewer_id": 0, "trained_chara_id": 0, "is_circle_member": False}
-        start_chara["scenario_id"] = 1
-        start_chara["selected_difficulty_info"] = {"difficulty_id": 0, "difficulty": 0}
-        start_chara["select_deck_id"] = 1
+            start_chara = {}
+            start_chara["card_id"] = chara_id
+            start_chara["support_card_ids"] = support_card_ids
+            start_chara["friend_support_card_info"] = friend_info
+            start_chara["succession_trained_chara_id_1"] = succ[0]
+            start_chara["succession_trained_chara_id_2"] = succ[1]
+            start_chara["rental_succession_trained_chara"] = {"viewer_id": 0, "trained_chara_id": 0, "is_circle_member": False}
+            start_chara["scenario_id"] = 1
+            start_chara["selected_difficulty_info"] = {"difficulty_id": 0, "difficulty": 0}
+            start_chara["select_deck_id"] = 1
 
 
-        data = {}
-        data["start_chara"] = start_chara
-        data["tp_info"] = info["tp_info"]
-        data["current_money"] = money
-        resp = await self.client.post("/single_mode/start", data)
+            data = {}
+            data["start_chara"] = start_chara
+            data["tp_info"] = info["tp_info"]
+            data["current_money"] = money
+            resp = await self.client.post("/single_mode/start", data)
 
-        # support card deck array
-        data = {}
-        data["support_card_deck_array"] = []
-        deck= {}
-        deck["deck_id"] = 1
-        deck["support_card_id_array"] = support_card_ids
-        for i in range(2, 11):
-            deck = {}
-            deck["deck_id"] = i
-            deck["support_card_id_array"] = [0, 0, 0, 0, 0]
-            data["support_card_deck_array"].append(deck)
-        await self.client.post("/support_card_deck/change_party", data)
+            # support card deck array
+            data = {}
+            data["support_card_deck_array"] = []
+            deck= {}
+            deck["deck_id"] = 1
+            deck["support_card_id_array"] = support_card_ids
+            for i in range(2, 11):
+                deck = {}
+                deck["deck_id"] = i
+                deck["support_card_id_array"] = [0, 0, 0, 0, 0]
+                data["support_card_deck_array"].append(deck)
+            await self.client.post("/support_card_deck/change_party", data)
 
-        # short_cut
-        data = {}
-        data["short_cut_state"] = 1
-        data["current_turn"] = 1
-        resp = await self.client.post("/single_mode/change_short_cut", data)
+            # short_cut
+            data = {}
+            data["short_cut_state"] = 1
+            data["current_turn"] = 1
+            resp = await self.client.post("/single_mode/change_short_cut", data)
 
         return resp["data"]
 
     def single_mode_check_route(self, info):
         chara_id = info["chara_info"]["card_id"] // 100
+        turn = info["chara_info"]["turn"]
         cur = self.con.cursor()
         races = cur.execute("select turn, condition_id from single_mode_route_race where race_set_id= %d" % chara_id).fetchall()
         routes = []
+        route_num = 0
         for r in races:
-            print(r)
             route = {}
             route["program_id"] = r[1]
             route["turn"] = r[0]
@@ -148,8 +155,10 @@ class Training(Derby):
                 route["fans"] = 0
             else:
                 route["fans"] = cur.execute("select need_fan_count from single_mode_program where id = %d" % r[1]).fetchone()[0]
+            if turn >= route["turn"]:
+                route_num = len(routes)
             routes.append(route)
-        return sorted(routes, key=lambda k:k["turn"])
+        return sorted(routes, key=lambda k:k["turn"]), route_num
 
     async def check_event(self, event, turn):
         data = {}
@@ -430,9 +439,8 @@ class Training(Derby):
 
     async def run(self, chara_id=None, sc_list=[], succ=[]):
         data = await self.single_mode_prepare(chara_id, sc_list, succ)
-        routes = self.single_mode_check_route(data)
+        routes, route_num = self.single_mode_check_route(data)
         race_property = self.detect_race_property(data)
-        route_num = 0
         while True:
             data = await self.single_mode_check_event(data)
             turn = data["chara_info"]["turn"]

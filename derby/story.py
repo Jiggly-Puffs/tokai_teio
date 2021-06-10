@@ -2,6 +2,7 @@
 
 from .derby import Derby
 import sqlite3
+import asyncio
 
 
 class Reading(Derby):
@@ -41,4 +42,4 @@ class Reading(Derby):
                 if story[1] in read_stories:
                     continue
                 await self.uma_read_chara_story(story[0])
-                await asyncio.sleep(1)
+                await asyncio.sleep(0.5)

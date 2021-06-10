@@ -2,6 +2,7 @@
 
 from .derby import Derby
 import logging
+import asyncio
 logger = logging.getLogger(__name__)
 
 
@@ -30,7 +31,7 @@ class Gacha(Derby):
         data["item_id"] = 0
         resp = await self.client.post("/gacha/exec", data)
 
-    def gacha_find_pool(gachas, category=1):
+    def gacha_find_pool(self, gachas, category):
         for gacha in gachas:
             # category: 0: uma pool / 1: support card pool
             if ((gacha["id"] // 10000) == 3) and ((gacha["id"] % 2) == category):
@@ -40,11 +41,14 @@ class Gacha(Derby):
     async def gacha_pulls(self, pulls, well=1, times=None, category=1):
         coins = (pulls * 150) * well
         fcoin = (await self.get_account_info())["coin_info"]["fcoin"]
+        coin_times = fcoin // coins
         if not times:
-            times = fcoin // coins
+            times = coin_times
+        if coin_times < times:
+            logger.error("No enough fcoin: %d" % fcoin)
         logger.info("To Gacha %d (one: %d)" % (times, coins))
         gachas = await self.get_gacha_info()
-        gacha_id = self.gacha_find_sc_pool(gachas, category)
+        gacha_id = self.gacha_find_pool(gachas, category)
         if gacha_id:
             for i in range(times):
                 for j in range(well):
@@ -52,7 +56,7 @@ class Gacha(Derby):
                     fcoin -= (pulls * 150)
                     await asyncio.sleep(3) # otherwise will trigger 208 fault ( DOUBLE_CLICK_ERROR )
 
-    async def run(self, mode):
+    async def run(self, mode, pulls=None):
         if mode == 1:
             # one well to support card gacha
             await self.gacha_pulls(10, 20)
@@ -66,4 +70,5 @@ class Gacha(Derby):
         elif mode == 4:
             # single pull
             await self.gacha_pulls(1)
-            logger.warning("No such gacha mode")
+        else:
+            await self.gacha_pulls(pulls[0], pulls[1], pulls[2], pulls[3])

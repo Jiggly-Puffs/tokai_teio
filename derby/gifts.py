@@ -11,7 +11,7 @@ class Gifts(Derby):
     def __del__(self):
         pass
 
-    def parse_mission(resp):
+    def parse_mission(self, resp):
         data = resp["data"]
         m = []
         if data.get("mission_list"):
