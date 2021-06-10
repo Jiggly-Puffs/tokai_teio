@@ -26,7 +26,7 @@ class AuthType(enum.Enum):
 
 class Account(Model):
     class Meta:
-        db_table = 'account'
+        table = 'account'
 
     id = fields.BigIntField(pk=True, source_field='id', null=False)
 
@@ -58,7 +58,7 @@ class Account(Model):
 
 class CardPrototype(Model):
     class Meta:
-        db_table = 'card_prototype'
+        table = 'card_prototype'
 
     # same as `card_id` in response
 
@@ -69,7 +69,8 @@ class CardPrototype(Model):
     cards: fields.ReverseRelation['Card']
 
 class Card(Model):
-    __tablename__ = 'card'
+    class Meta:
+        table = 'card'
 
     id: int = fields.BigIntField(pk=True, null=False)
 
@@ -84,7 +85,7 @@ class Card(Model):
 
 class SupportCardPrototype(Model):
     class Meta:
-        db_table = 'support_card_prototype'
+        table = 'support_card_prototype'
 
     id = fields.BigIntField(pk=True, null=False)
     name = fields.TextField()
@@ -93,7 +94,7 @@ class SupportCardPrototype(Model):
 
 class SupportCard(Model):
     class Meta:
-        db_table = 'support_card'
+        table = 'support_card'
     id: int = fields.BigIntField(pk=True, null=False)
 
     account: fields.ForeignKeyNullableRelation[Account] = \

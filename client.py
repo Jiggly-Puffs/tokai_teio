@@ -32,7 +32,6 @@ class UmaClient(object):
 
     def __init__(self, data=None):
         self.tmp_dir = tempfile.TemporaryDirectory(prefix="UmaClient")
-        logger.info(self.tmp_dir.name)
         if data:
             self.load(data)
             #self.omotenashi()
