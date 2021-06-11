@@ -2,6 +2,7 @@
 
 import os
 import uuid
+import ssl
 import json
 import httpx
 import base64
@@ -247,9 +248,15 @@ class UmaClient(object):
         logger.debug("Headers: %s" % str(headers))
         logger.debug("Req: %s" % data)
         req = self.con_req(data)
-
-        async with httpx.AsyncClient() as client:
-            r = await client.post(url, content=req, headers=headers)
+        for i in range(5):
+            try:
+                async with httpx.AsyncClient() as client:
+                    r = await client.post(url, content=req, headers=headers)
+                break
+            except (httpx.ReadTimeout, httpx.ProxyError, ssl.SSLError) as e:
+                await asyncio.sleep(1)
+        else:
+            raise e
 
         if r.status_code != 200:
             logger.error("url: %s\n Error code: %d" % (url, r.status_code))

@@ -43,7 +43,7 @@ async def job():
 async def main():
     await db.init()
     jobs = []
-    for _ in range(40):
+    for _ in range(20):
         jobs.append(job())
     await asyncio.gather(*jobs)
 
