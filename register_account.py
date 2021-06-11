@@ -18,6 +18,10 @@ async def job():
             #FIXME: should have more specific Exception
             logger.warning("UserName duplicate?", exc_info=e, stack_info=True)
             continue
+        except Exception as e:
+            logger.error("Unknown Exception", exc_info=e)
+            continue
+
 
         j = client.tojson()
         device_info = j["device_info"]
@@ -38,10 +42,10 @@ async def job():
 
 async def main():
     await db.init()
+    jobs = []
     for _ in range(40):
-        asyncio.run_coroutine_threadsafe(job(), asyncio.get_event_loop())
-    while True:
-        await asyncio.sleep(1000)
+        jobs.append(job())
+    await asyncio.gather(*jobs)
 
 
 if __name__ == "__main__":
