@@ -80,9 +80,11 @@ class TeamRace(Derby):
 
     async def run(self, edit=False):
         info = await self.get_account_info()
-        if not info["rp_info"]["current_rp"]:
-            logger.warning("No enough rp")
         resp = await self.client.post("/team_stadium/index")
+        if not info["rp_info"]["current_rp"] and not resp["data"]["race_status"]:
+            # no rp & no race
+            logger.warning("No enough rp")
+            return
         # team edit
         if edit:
             await self.team_stadium_edit(info)

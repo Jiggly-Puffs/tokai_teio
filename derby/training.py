@@ -79,7 +79,8 @@ class Training(Derby):
 
     async def single_mode_prepare(self, chara_id, sc_list, succ):
         info = await self.get_account_info()
-        if info["tp_info"]["current_tp"] < 30:
+        if info["tp_info"]["current_tp"] < 30 and not info["single_mode_chara_light"]:
+            # no tp & no load
             logger.warning("No enough tp %d" % info["tp_info"]["current_tp"])
             return None
         if info["single_mode_chara_light"]:
@@ -147,7 +148,7 @@ class Training(Derby):
         chara_id = info["chara_info"]["card_id"] // 100
         turn = info["chara_info"]["turn"]
         cur = self.con.cursor()
-        races = cur.execute("select turn, condition_id from single_mode_route_race where race_set_id= %d" % chara_id).fetchall()
+        races = cur.execute("select turn, condition_id, condition_value_1 from single_mode_route_race where race_set_id= %d" % chara_id).fetchall()
         routes = []
         route_num = 0
         for r in races:
@@ -156,6 +157,8 @@ class Training(Derby):
             route["turn"] = r[0]
             if r[1] > 10000:
                 route["fans"] = 0
+            elif r[1] == 0:
+                route["fans"] = r[2]
             else:
                 route["fans"] = cur.execute("select need_fan_count from single_mode_program where id = %d" % r[1]).fetchone()[0]
             if turn >= route["turn"]:
@@ -462,7 +465,7 @@ class Training(Derby):
                 race_id = None
                 if fans < routes[route_num]["fans"]:
                     need_fans = routes[route_num]["fans"] - fans
-                    if ((need_fans+1000) // 1000) >= (routes[route_num]["turn"] - turn):
+                    if ((need_fans+3000) // 1000) >= (routes[route_num]["turn"] - turn):
                         need_run = ((turn+1) == routes[route_num]["turn"])
                         race_id = self.choose_race(data, need_run, race_property)
                 if race_id:

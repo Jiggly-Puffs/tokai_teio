@@ -49,7 +49,7 @@ async def test_team_race():
 
 
 async def job():
-    await test_team_race()
+    await test_single_mode()
 
 
 async def main():
