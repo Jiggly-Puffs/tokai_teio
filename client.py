@@ -231,6 +231,8 @@ class UmaClient(object):
         # update session_id first if we want to continue after error
         if resp["response_code"] != 1:
             logger.error("ERROR RESPONSE_CODE %s: %s!!!" % (resp["response_code"], RESPCODE(resp["response_code"]).name))
+            # FIXME: the exception should different from status_code error
+            raise UmaClientResponseErrorException(resp["response_code"])
 
     async def post(self, url, data={}):
         await asyncio.sleep(0.1) # avoid double click
@@ -247,9 +249,15 @@ class UmaClient(object):
 
         if r.status_code != 200:
             logger.error("url: %s\n Error code: %d" % (url, r.status_code))
+            # FIXME: the exception should different from response_code error
             raise UmaClientResponseErrorException(r.status_code)
 
-        resp = msgpack.unpackb(self.decompress(r.text), raw=False)
+        try:
+            resp = msgpack.unpackb(self.decompress(r.text), raw=False)
+        except msgpack.ExtraData as e:
+            logger.warning("msgpack ExtraData")
+            resp = e.args[0]
+
         self.update_session_id(resp)
         return resp
 
