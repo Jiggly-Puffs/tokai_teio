@@ -27,6 +27,10 @@ UMA_PUBKEY = "6b20e2ab6c311330f761d737ce3f3025750850665eea58b6372f8d2f57501eb3e6
 
 USER_AGENT = "Mozilla/5.0 (Linux; Android 10; SM-A102U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.72 Mobile Safari/537.36"
 
+class UmaClientResponseErrorException(Exception):
+    def __init__(self, status_code: int):
+        super().__init__()
+        self.status_code = status_code
 
 class UmaClient(object):
 
@@ -237,23 +241,15 @@ class UmaClient(object):
         logger.debug("Headers: %s" % str(headers))
         logger.debug("Req: %s" % data)
         req = self.con_req(data)
-        for i in range(5):
-            try:
-                async with httpx.AsyncClient() as client:
-                    r = await client.post(url, content=req, headers=headers)
-                break
-            except Exception as e:
-                if i == 4:
-                    logger.error("HTTP Max Tried Timeout")
-                logger.warning("HTTP request failed", exc_info=e)
-                await asyncio.sleep(1)
+
+        async with httpx.AsyncClient() as client:
+            r = await client.post(url, content=req, headers=headers)
+
         if r.status_code != 200:
             logger.error("url: %s\n Error code: %d" % (url, r.status_code))
-        try:
-            resp = msgpack.unpackb(self.decompress(r.text), raw=False)
-        except msgpack.ExtraData as e:
-            logger.warning("msgpack ExtraData")
-            resp = e.args[0] # ExtraData(ret, unpacker._get_extradata())
+            raise UmaClientResponseErrorException(r.status_code)
+
+        resp = msgpack.unpackb(self.decompress(r.text), raw=False)
         self.update_session_id(resp)
         return resp
 
