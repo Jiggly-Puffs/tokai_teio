@@ -79,6 +79,9 @@ class Training(Derby):
 
     async def single_mode_prepare(self, chara_id, sc_list, succ):
         info = await self.get_account_info()
+        if info["tp_info"]["current_tp"] < 30:
+            logger.warning("No enough tp %d" % info["tp_info"]["current_tp"])
+            return None
         if info["single_mode_chara_light"]:
             # load single mode
             resp = await self.client.post("/single_mode/load")
@@ -439,6 +442,8 @@ class Training(Derby):
 
     async def run(self, chara_id=None, sc_list=[], succ=[]):
         data = await self.single_mode_prepare(chara_id, sc_list, succ)
+        if not data:
+            return
         routes, route_num = self.single_mode_check_route(data)
         race_property = self.detect_race_property(data)
         while True:

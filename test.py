@@ -35,19 +35,21 @@ async def test_single_mode():
     await derby.Gacha(client).run(5, [10, 1, 2, 1])
     await derby.SupportCard(client).run()
     await derby.Training(client).run()
+    await derby.Gifts(client).run()
     info = await client.get_info()
+    await test_team_race()
 
 
 async def test_team_race():
     data = json.loads(open("./data/derby.json", "r").readlines()[-1])
     client = UmaClient(data)
     await client.signin()
-    await derby.TeamRace(client).run()
+    await derby.TeamRace(client).run(edit=True)
     info = await client.get_info()
 
 
 async def job():
-    await test_single_mode()
+    await test_team_race()
 
 
 async def main():

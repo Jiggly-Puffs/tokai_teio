@@ -45,7 +45,8 @@ class Gacha(Derby):
         if not times:
             times = coin_times
         if coin_times < times:
-            logger.error("No enough fcoin: %d" % fcoin)
+            logger.warning("No enough fcoin: %d" % fcoin)
+            return
         logger.info("To Gacha %d (one: %d)" % (times, coins))
         gachas = await self.get_gacha_info()
         gacha_id = self.gacha_find_pool(gachas, category)

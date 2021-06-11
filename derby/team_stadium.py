@@ -37,8 +37,7 @@ class TeamRace(Derby):
             arr.append(member)
         return tr, arr
 
-    async def team_stadium_edit(self):
-        info = await self.get_account_info()
+    async def team_stadium_edit(self, info):
         score = 0
         teams = []
         choosed_chara = []
@@ -75,21 +74,30 @@ class TeamRace(Derby):
 
         data = {}
         data["team_data_array"] = teams
+        # FIXME: team_evaluation_point error calculation
         data["team_evaluation_point"] = score
         await self.client.post("/team_stadium/team_edit", data)
 
     async def run(self, edit=False):
-        await self.client.post("/team_stadium/index")
-
+        info = await self.get_account_info()
+        if not info["rp_info"]["current_rp"]:
+            logger.warning("No enough rp")
+        resp = await self.client.post("/team_stadium/index")
         # team edit
         if edit:
-            await self.team_stadium_edit()
+            await self.team_stadium_edit(info)
+        if resp["data"]["race_status"] == 1:
+            # already have race
+            data = {}
+            data["opponent_info"] = {"strength": 0, "opponent_viewer_id": 0, "evaluation_point": 0, "user_info": null, "team_data_array": null, "trained_chara_array": null, "winning_reward_guarantee_status": 0}
+        else:
+            # find opponent
+            resp = await self.client.post("/team_stadium/opponent_list")
 
-        resp = await self.client.post("/team_stadium/opponent_list")
+            data = {}
+            resp["data"]["opponent_info_array"][-1].pop(None)
+            data["opponent_info"] = resp["data"]["opponent_info_array"][-1]
 
-        data = {}
-        resp["data"]["opponent_info_array"][-1].pop(None)
-        data["opponent_info"] = resp["data"]["opponent_info_array"][-1]
         await self.client.post("/team_stadium/decide_frame_order", data)
 
         data = {}
