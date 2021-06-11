@@ -52,6 +52,18 @@ if __name__ == "__main__":
     import coloredlogs
     coloredlogs.install(logging.INFO)
 
+    class MyFilter(logging.Filter):
+        def __init__(self, level):
+            self.__level = level
+
+        def filter(self, logRecord):
+            return logRecord.levelno >= self.__level
+
+    handler = logging.FileHandler('register.log')
+    handler.addFilter(MyFilter(logging.ERROR))
+    logging.getLogger().addHandler(handler)
+
+
     import dotenv
     dotenv.load_dotenv() # install .env into os.env
 
