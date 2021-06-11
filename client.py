@@ -51,7 +51,7 @@ class UmaClient(object):
         self.password = data.get("password", "")
         self.gen_session_id()
 
-    def tojson(self):
+    def tojson(self) -> dict:
         data = {}
         data["app_viewer_id"] = self.app_viewer_id
         data["device_info"] = self.device_info
@@ -60,7 +60,7 @@ class UmaClient(object):
         assert self.auth_key is not None
         data["auth_key"] = base64.b64encode(self.auth_key).decode("utf8")
         data["password"] = self.password
-        return json.dumps(data)
+        return data
 
     def gen_device_info(self):
         BRANDS = ["Samsung", "Xiaomi", "Sony", "Sharp", "Toshiba", "Google", "Casio", "Fujitsu", "HP", "Lenovo", "LG", "Panasonic", "Kyocera", "DoCoMo"]

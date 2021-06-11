@@ -1,11 +1,10 @@
 import logging
-import aiofiles
 import asyncio
-import json
 import model
 import argparse
 import db
 import datetime
+import derby
 from client import UmaClient
 
 logger = logging.getLogger(__name__)
@@ -23,6 +22,9 @@ async def job(account: model.Account):
 
         client = UmaClient(data)
         await client.signin()
+
+        # recieve all gifts
+        await derby.Gifts(client).run()
 
         info = await client.get_info()
         logger.info("update support_card & card %d", account.id)
@@ -69,7 +71,7 @@ async def main():
     jobs = []
     for account in accounts:
         jobs.append(job(account))
-        
+
     await asyncio.gather(*jobs)
 
 
