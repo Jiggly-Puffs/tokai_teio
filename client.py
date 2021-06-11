@@ -243,9 +243,9 @@ class UmaClient(object):
                     r = await client.post(url, content=req, headers=headers)
                 break
             except Exception as e:
-                logger.warning(str(e))
                 if i == 4:
                     logger.error("HTTP Max Tried Timeout")
+                logger.warning("HTTP request failed", exc_info=e)
                 await asyncio.sleep(1)
         if r.status_code != 200:
             logger.error("url: %s\n Error code: %d" % (url, r.status_code))

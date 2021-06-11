@@ -102,7 +102,7 @@ class SupportCard(Model):
     prototype: fields.ForeignKeyNullableRelation[SupportCardPrototype] = \
             fields.ForeignKeyField("model.SupportCardPrototype", source_field='prototype_id', related_name="support_cards") # type: ignore
 
-    favorite_flag = fields.BigIntField(null=False)
-    limit_break_count = fields.BigIntField(null=False)
-    stock = fields.BigIntField(null=False)
-    exp = fields.BigIntField(null=False)
+    favorite_flag = fields.BigIntField()
+    limit_break_count = fields.BigIntField()
+    stock = fields.BigIntField()
+    exp = fields.BigIntField()
