@@ -63,19 +63,23 @@ async def job(account: model.Account):
 async def main():
     global g_sem
 
-    g_sem = asyncio.Semaphore(40)
+    g_sem = asyncio.Semaphore(100)
 
     parser = argparse.ArgumentParser()
     options = parser.parse_args()
 
     await db.init()
 
-    accounts = await model.Account.all().filter(is_deleted=False).order_by('latest_refresh_timestamp')
-    jobs = []
-    for account in accounts:
-        jobs.append(job(account))
-
-    await asyncio.gather(*jobs)
+    accounts = model.Account.all().filter(is_deleted=False).order_by('latest_refresh_timestamp')
+    no_concurrent = 100
+    dltasks = set()
+    loop = asyncio.get_event_loop()
+    async for account in accounts:
+        if len(dltasks) >= no_concurrent:
+            _done, dltasks = await asyncio.wait(
+                dltasks, return_when=asyncio.FIRST_COMPLETED)
+        dltasks.add(loop.create_task(job(account)))
+    await asyncio.wait(dltasks)
 
 
 if __name__ == "__main__":

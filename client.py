@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-
+import subprocess
 import os
 import uuid
 import ssl
@@ -203,7 +203,8 @@ class UmaClient(object):
 
     def compress(self, data):
         open(f"{self.tmp_dir.name}/req", "wb").write(data)
-        os.system(f"./utils/proto 0 {self.tmp_dir.name}")
+        subprocess.check_call(["./utils/proto", "0", self.tmp_dir.name])
+        #os.system(f"./utils/proto 0 {self.tmp_dir.name}")
         try:
             return base64.b64encode(open(f"{self.tmp_dir.name}/req.enc", "rb").read())
         except Exception:
@@ -212,7 +213,7 @@ class UmaClient(object):
 
     def decompress(self, data):
         open(f"{self.tmp_dir.name}/resp", "wb").write(base64.b64decode(data.strip()))
-        os.system(f"./utils/proto 1 {self.tmp_dir.name}")
+        subprocess.check_call(["./utils/proto", "1", self.tmp_dir.name])
         return open(f"{self.tmp_dir.name}/resp.dec", "rb").read()
 
     def con_headers(self):
