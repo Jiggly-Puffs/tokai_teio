@@ -21,9 +21,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-UMA_URL = "https://api-umamusume.cygames.jp/umamusume"
 APP_VER = "1.5.0"
-RES_VER = "10001600:TWkRoYkxC4KX"
+RES_VER = "10001700:TZaVslP/7/9O"
 UMA_PUBKEY = "6b20e2ab6c311330f761d737ce3f3025750850665eea58b6372f8d2f57501eb3e6355f6fd9f01d9a3aba9d89cabd628635279b8a"
 
 USER_AGENT = "Mozilla/5.0 (Linux; Android 10; SM-A102U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.72 Mobile Safari/537.36"
@@ -241,6 +240,7 @@ class UmaClient(object):
 
     async def post(self, url, data={}):
         await asyncio.sleep(0.1) # avoid double click
+        UMA_URL = os.environ.get("API_ENDPOINT", "https://api-umamusume.cygames.jp/umamusume")
         url = UMA_URL + url
         headers = self.con_headers()
         data.update(self.device_info)
@@ -255,7 +255,7 @@ class UmaClient(object):
                 async with httpx.AsyncClient() as client:
                     r = await client.post(url, content=req, headers=headers)
                     break
-            except (httpx.ReadTimeout, httpx.ProxyError, ssl.SSLError) as e:
+            except (httpx.ReadTimeout, httpx.ProxyError, ssl.SSLError, httpx.ConnectTimeout) as e:
                 await asyncio.sleep(1)
 
         # Final Try
