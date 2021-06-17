@@ -1,5 +1,6 @@
 from tortoise.models import Model
 from tortoise import fields
+from typing import Optional
 import datetime
 import enum
 
@@ -28,25 +29,25 @@ class Account(Model):
     class Meta:
         table = 'account'
 
-    id = fields.BigIntField(pk=True, source_field='id', null=False)
+    id: int = fields.BigIntField(pk=True, source_field='id', null=False)
 
-    create_timestamp = fields.DatetimeField(null=False, auto_now_add=True)
-    update_timestamp = fields.DatetimeField(null=False, auto_now=True)
-    latest_login_timestamp = fields.DatetimeField(null=False, default=datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc))
-    latest_refresh_timestamp = fields.DatetimeField(null=False, default=datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc))
+    create_timestamp: datetime.datetime = fields.DatetimeField(null=False, auto_now_add=True)
+    update_timestamp: datetime.datetime = fields.DatetimeField(null=False, auto_now=True)
+    latest_login_timestamp: datetime.datetime = fields.DatetimeField(null=False, default=datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc))
+    latest_refresh_timestamp: datetime.datetime = fields.DatetimeField(null=False, default=datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc))
 
-    is_deleted = fields.BooleanField(null=False, default=False)
+    is_deleted: bool = fields.BooleanField(null=False, default=False) # type: ignore
 
-    viewer_id = fields.BigIntField(unique=True)
+    viewer_id: int = fields.BigIntField(unique=True)
 
-    gender = fields.CharEnumField(Gender, max_length=64, null=True)
-    nickname = fields.TextField()
-    fcoin = fields.TextField()
+    gender: Optional[Gender] = fields.CharEnumField(Gender, max_length=64, null=True)
+    nickname: Optional[str] = fields.TextField()
+    fcoin: int = fields.BigIntField()
 
-    auth_type = fields.CharEnumField(AuthType, max_length=64)
-    auth_key = fields.TextField()
-    app_viewer_id = fields.TextField()
-    password = fields.TextField()
+    auth_type: AuthType = fields.CharEnumField(AuthType, max_length=64)
+    auth_key: Optional[str] = fields.TextField()
+    app_viewer_id: Optional[str] = fields.TextField()
+    password: Optional[str] = fields.TextField()
 
     device_info = fields.JSONField()
     firebase = fields.JSONField()

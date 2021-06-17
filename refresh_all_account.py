@@ -27,6 +27,7 @@ async def job(account: model.Account):
         await derby.Gifts(client).run()
 
         info = await client.get_info()
+
         logger.info("update support_card & card %d", account.id)
         for support_card_j in info["support_card_list"]:
             support_card_prototype, _ = await model.SupportCardPrototype.get_or_create(
@@ -55,7 +56,9 @@ async def job(account: model.Account):
             await card.save()
         logger.info("update support_card & card done %d", account.id)
 
-        await account.update_from_dict({"latest_refresh_timestamp": datetime.datetime.now()}).save()
+        account.latest_refresh_timestamp = datetime.datetime.now()
+        account.fcoin = info["fcoin"]
+        await account.save()
 
 async def main():
     global g_sem
