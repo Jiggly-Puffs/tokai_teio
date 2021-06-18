@@ -66,16 +66,17 @@ async def main():
 
     await db.init()
 
-    accounts = model.Account.all().filter(is_deleted=False).order_by('latest_refresh_timestamp')
-    no_concurrent = 250
-    dltasks = set()
-    loop = asyncio.get_event_loop()
-    async for account in accounts:
-        if len(dltasks) >= no_concurrent:
-            _done, dltasks = await asyncio.wait(
-                dltasks, return_when=asyncio.FIRST_COMPLETED)
-        dltasks.add(loop.create_task(job(account)))
-    await asyncio.wait(dltasks)
+    while True:
+        accounts = model.Account.all().filter(is_deleted=False).order_by('latest_refresh_timestamp').limit(1000)
+        no_concurrent = 50
+        dltasks = set()
+        loop = asyncio.get_event_loop()
+        async for account in accounts:
+            if len(dltasks) >= no_concurrent:
+                _done, dltasks = await asyncio.wait(
+                    dltasks, return_when=asyncio.FIRST_COMPLETED)
+            dltasks.add(loop.create_task(job(account)))
+        await asyncio.wait(dltasks)
 
 
 if __name__ == "__main__":
