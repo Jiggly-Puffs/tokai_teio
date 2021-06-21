@@ -21,9 +21,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-APP_VER = "1.5.0"
-RES_VER = "10001700:TZaVslP/7/9O"
-UMA_PUBKEY = "6b20e2ab6c311330f761d737ce3f3025750850665eea58b6372f8d2f57501eb3e6355f6fd9f01d9a3aba9d89cabd628635279b8a"
+APP_VER = "1.5.5"
+RES_VER = "10001800:Tej4/mpgopXa"
+UMA_PUBKEY = "6b20e2ab6c311330f761d737ce3f3025750850665eea58b6372f8d2f57501eb3009fdc41eb4431d6c0f71dae9f3c65c14dc64b64"
 
 USER_AGENT = "Mozilla/5.0 (Linux; Android 10; SM-A102U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.72 Mobile Safari/537.36"
 
@@ -249,7 +249,7 @@ class UmaClient(object):
         logger.debug("Headers: %s" % str(headers))
         logger.debug("Req: %s" % data)
         req = self.con_req(data)
-        
+
         r = None
         for _ in range(4):
             try:
