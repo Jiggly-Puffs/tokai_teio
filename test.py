@@ -49,7 +49,8 @@ async def test_team_race():
 
 
 async def job():
-    await test_single_mode()
+    await test_signup(1)
+    #await test_single_mode()
 
 
 async def main():

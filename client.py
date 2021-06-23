@@ -14,16 +14,25 @@ import msgpack
 import secrets
 import asyncio
 import tempfile
+import ctypes
+import Crypto.Cipher.AES
+import Crypto.Cipher._mode_gcm
+from utils import proto
 from hashlib import md5
 from utils import RESPCODE
 
 import logging
+
+import nacl.public
 logger = logging.getLogger(__name__)
 
 
 APP_VER = "1.5.5"
 RES_VER = "10001800:Tej4/mpgopXa"
 UMA_PUBKEY = "6b20e2ab6c311330f761d737ce3f3025750850665eea58b6372f8d2f57501eb3009fdc41eb4431d6c0f71dae9f3c65c14dc64b64"
+UMA_PUBKEY = codecs.decode(UMA_PUBKEY.encode(), "hex")
+UMA_AUTHDATA = UMA_PUBKEY[32:]
+UMA_PUBKEY = UMA_PUBKEY[:32]
 
 USER_AGENT = "Mozilla/5.0 (Linux; Android 10; SM-A102U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.72 Mobile Safari/537.36"
 
@@ -36,6 +45,7 @@ class UmaClient(object):
 
     def __init__(self, data=None):
         self.tmp_dir = tempfile.TemporaryDirectory(prefix="UmaClient")
+
         if data:
             self.load(data)
             #self.omotenashi()
@@ -86,7 +96,7 @@ class UmaClient(object):
         }
 
     def gen_session_id(self):
-        self.cert_uuid = codecs.decode(self.app_viewer_id.replace("-", ""), "hex")
+        self.cert_uuid = codecs.decode(self.app_viewer_id.replace("-", "").encode(), "hex")
         self.session_id = md5((str(self.viewer_id) + self.app_viewer_id + 'r!I@mt8e5i=').encode("utf8")).digest()
 
     def init(self):
@@ -190,7 +200,104 @@ class UmaClient(object):
         data["log_message"] = "Google Play In-app Billing API version is less than 3"
         await self.post("/payment/send_log", data)
 
+
     def con_req(self, req):
+        data = msgpack.packb(req)
+        server_public = nacl.public.PublicKey(UMA_PUBKEY)
+
+        self.client_private_key = nacl.public.PrivateKey.generate()
+        
+        box = nacl.public.Box(self.client_private_key, server_public)
+        self.shared_secret = box.shared_key()
+        assert isinstance(self.shared_secret, bytes)
+        assert len(self.shared_secret) == 32
+
+        if not self.auth_key:
+            auth_info= proto.AuthInfo()
+            auth_info.type = 0
+
+            assert ctypes.sizeof(auth_info.cert_uuid.cert_uuid) == len(self.cert_uuid)
+            ctypes.memmove(auth_info.cert_uuid.cert_uuid, self.cert_uuid, len(self.cert_uuid))
+            assert(ctypes.sizeof(auth_info.cert_uuid.random_padding) == 18)
+            ctypes.memmove(auth_info.cert_uuid.random_padding, secrets.token_bytes(ctypes.sizeof(auth_info.cert_uuid.random_padding)), ctypes.sizeof(auth_info.cert_uuid.random_padding))
+
+            self.auth = self.cert_uuid
+            aes_data = self.cert_uuid
+
+            
+        else:
+            '''
+            auth_info= proto.AuthInfo()
+            auth_info.type = 1
+
+            #assert ctypes.sizeof(auth_info.auth_key.auth_key) == len(self.auth_key)
+            ctypes.memmove(auth_info.auth_key.auth_key, self.auth_key, 34)
+
+            self.auth = self.auth_key[34:]
+            assert len(self.auth) == 16
+
+            aes_data = md5(self.session_id + self.auth + self.cert_uuid).digest()
+            '''
+            assert False
+
+        aes_data2 = list(self.shared_secret[:16])
+        for  i in range(16):
+            c1 = aes_data[i] ^ aes_data2[i]
+            c2 = self.shared_secret[c1 & 0xF] ^ aes_data[i]
+            c3 = aes_data2[c2 & 0xF] ^ aes_data[i]
+            c4 = UMA_AUTHDATA[c3 & 0xF] ^ aes_data[i]
+            aes_data2[c2 & 0xF] ^= c1
+            aes_data2[c3 & 0xF] ^= c2 
+            aes_data2[c4 & 0xF] ^= c3 
+            aes_data2[c1 & 0xF] ^= c4 
+        print("aes_data2", aes_data2)
+        aes_data2 = bytes(aes_data2)
+        print("aes_data2", aes_data2)
+
+        assert len(aes_data2) == 0x10
+        assert len(aes_data) == 0x10
+
+        assert len(UMA_AUTHDATA) == 0x14
+        aes_key = md5(aes_data2 + self.shared_secret + aes_data + UMA_AUTHDATA).digest()
+
+        aes = Crypto.Cipher.AES.new(self.shared_secret, Crypto.Cipher.AES.MODE_CTR, initial_value=self.client_private_key.public_key.encode()[:16], nonce=b"")
+        encrypted_auth_info = aes.encrypt(bytes(auth_info)) # type: ignore
+        assert len(encrypted_auth_info) == 0x24
+
+        print("auth_info", codecs.encode(bytes(auth_info), "hex")) # type: ignore
+
+        
+        assert len(self.session_id) == 16
+        assert len(self.cert_uuid) == 16
+        gcm_iv = md5(self.client_private_key.public_key.encode() + self.session_id + self.cert_uuid).digest()
+
+        aes = Crypto.Cipher.AES.new(aes_key, Crypto.Cipher.AES.MODE_GCM, nonce=gcm_iv,)
+        assert len(UMA_AUTHDATA + self.session_id + self.cert_uuid) == 0x34
+        assert isinstance(aes, Crypto.Cipher._mode_gcm.GcmMode)
+
+        aes.update(UMA_AUTHDATA + self.session_id + self.cert_uuid)
+        encrypted_data, auth_tag = aes.encrypt_and_digest(data) # type: ignore
+
+        req = proto.UmaRequest()
+        ctypes.memmove(req.client_pubkey, self.client_private_key.public_key.encode(), ctypes.sizeof(req.client_pubkey))
+        ctypes.memmove(req.aes_info, encrypted_auth_info, ctypes.sizeof(req.aes_info))
+        ctypes.memmove(req.auth_tag, auth_tag, ctypes.sizeof(req.auth_tag))
+        req.data = encrypted_data
+        req.size = ctypes.sizeof(req) - 4
+
+        open(f"{self.tmp_dir.name}/info", "wb").write(self.shared_secret + self.session_id + self.auth)
+        print(hex(req.size+4))
+        print(hex(len(bytes(req))))
+        return base64.b64encode(bytes(req))
+        
+
+
+
+
+
+        
+
+    def con_req_bak(self, req):
         data = codecs.decode(UMA_PUBKEY, "hex")
         data += self.session_id
         data += self.cert_uuid
