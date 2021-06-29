@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 APP_VER = "1.5.6"
-RES_VER = "10001800:Tej4/mpgopXa"
+RES_VER = "10001900:TQN8+nghtqw5"
 UMA_PUBKEY = "6b20e2ab6c311330f761d737ce3f3025750850665eea58b6372f8d2f57501eb30d05104d5f315e8b7d3628003474bfe4dd716d43"
 
 USER_AGENT = "Mozilla/5.0 (Linux; Android 10; SM-A102U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.72 Mobile Safari/537.36"
