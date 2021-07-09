@@ -47,9 +47,14 @@ async def test_team_race():
     await derby.TeamRace(client).run(edit=True)
     info = await client.get_info()
 
+async def test_gacha():
+    data = json.loads(open("./data/derby.json", "r").readlines()[-1])
+    client = UmaClient(data)
+    await client.signin()
+    await derby.Gacha(client).run(5, [1, 1, 1, 1])
 
 async def job():
-    await test_signup(1)
+    await test_gacha()
 
 
 async def main():
