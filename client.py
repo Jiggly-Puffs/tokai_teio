@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 APP_VER = "1.6.0"
-RES_VER = "10001940:TbBl4JYymoC5"
+RES_VER = "10002000:TWuPn1NSQA/8"
 UMA_PUBKEY = "6b20e2ab6c311330f761d737ce3f3025750850665eea58b6372f8d2f57501eb36d5c30ba27c938f5bca9d1d99064981951dbca43"
 
 USER_AGENT = "Mozilla/5.0 (Linux; Android 10; SM-A102U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.72 Mobile Safari/537.36"
@@ -159,13 +159,14 @@ class UmaClient(object):
         await self.post("/tutorial/skip")
 
         await self.post("/load/index")
-
+        '''
         await self.post("/payment/item_list")
 
         data = {}
         data["log_key"] = 3
         data["log_message"] = "Google Play In-app Billing API version is less than 3"
         await self.post("/payment/send_log", data)
+        '''
 
     async def get_info(self):
         resp = await self.post("/load/index")
@@ -182,13 +183,14 @@ class UmaClient(object):
         self.parse_res_ver(resp)
 
         await self.post("/load/index")
-
+        '''
         await self.post("/payment/item_list")
 
         data = {}
         data["log_key"] = 3
         data["log_message"] = "Google Play In-app Billing API version is less than 3"
         await self.post("/payment/send_log", data)
+        '''
 
     def con_req(self, req):
         data = codecs.decode(UMA_PUBKEY, "hex")
@@ -251,10 +253,13 @@ class UmaClient(object):
         req = self.con_req(data)
 
         r = None
-        for _ in range(4):
+        for _ in range(3):
             try:
                 async with httpx.AsyncClient() as client:
                     r = await client.post(url, content=req, headers=headers)
+                    if r.status_code != 200:
+                        logger.warn("wrong response %d" % r.status_code)
+                        continue
                     break
             except (httpx.ReadTimeout, httpx.ProxyError, ssl.SSLError, httpx.ConnectTimeout) as e:
                 await asyncio.sleep(1)
