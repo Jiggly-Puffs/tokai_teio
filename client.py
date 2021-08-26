@@ -21,9 +21,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-APP_VER = "1.7.0"
-RES_VER = "10002150:TaoV5lq3QuUx"
-UMA_PUBKEY = "6b20e2ab6c311330f761d737ce3f3025750850665eea58b6372f8d2f57501eb341fe3a08187b9a37b9ab1ca33c43b6c3202bdd0d"
+APP_VER = "1.9.0"
+RES_VER = "10002610:TSQfQ1mesjD7"
+UMA_PUBKEY = "6b20e2ab6c311330f761d737ce3f3025750850665eea58b6372f8d2f57501eb311fc4973d9ac83bd9957bfd3c81f78630b278d7c"
 
 USER_AGENT = "Mozilla/5.0 (Linux; Android 10; SM-A102U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.72 Mobile Safari/537.36"
 
